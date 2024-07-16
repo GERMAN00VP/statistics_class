@@ -3,8 +3,6 @@ import anndata as ad
 import numpy as np
 import scipy as sp
 
-
-
 class Stastics:
 
     def __init__(self, data, metadata):
@@ -13,13 +11,14 @@ class Stastics:
 
         self.do_description()
 
-        self.dict_comp_1_1 = {"Comparisson":["Normal_Data","Test","P-value","Abs_Mean_Difference","Abs_Hodges_Lehmann_Estimator"]}
+        self.dict_comp_1_1 = {"Comparisson":["Normal_Data","Test","P-value","Mean_Difference","Hodges_Lehmann_Estimator"]}
 
         self.df_comp_1_1 = pd.DataFrame(self.dict_comp_1_1).T
 
 
     
     def do_description(self,name="All"):
+
         """_summary_
 
         Args:
@@ -80,7 +79,6 @@ class Stastics:
             : _description_
 
         """
-
 
         if type(condition)!="NoneType":
 
@@ -161,8 +159,6 @@ class Stastics:
         return self.df_comp_1_1
 
 
-
-
     # Método para calcular la matriz de correlaciones
     def __correlations(self,df1,df2,name,method='spearman',save_in="varm"):
 
@@ -230,6 +226,18 @@ class Stastics:
 
         self.__correlations(df1,df2,name="Variables_Variables")
 
+    def order_comparisons(self,index):
+        """
+        Args:
+            index (pd.Index): index of the results DataFrame
+
+        Returns:
+            Values of the index strings oredered
+        """
+        parts = index.split(" vs ")
+        parts.sort()
+        return " vs ".join(parts)
+
 
     def generate_corr_report(self,name="Variables_Variables",save_in="varm"):
 
@@ -253,7 +261,7 @@ class Stastics:
             matrix_dict = self.adata.uns
 
 
-        correlated_vars,corr,pval,num = [], [], [], []
+        var1,var2,corr,pval,num = [], [], [], [], []
 
         df_bool = matrix_dict[f"{name}_Corr"]<0.999  # A dataframe that indicates the self correlation variables
 
@@ -261,7 +269,8 @@ class Stastics:
 
             for term in df_bool.index[df_bool[col]].tolist():
 
-                correlated_vars.append(f"{col} vs {term}")
+                var1.append(col)
+                var2.append(term)
                 corr.append(matrix_dict[f"{name}_Corr"].loc[term,col])
                 pval.append(matrix_dict[f"{name}_Corr_pval"].loc[term,col])
                 num.append(matrix_dict[f"{name}_Corr_N"].loc[term,col])
@@ -269,13 +278,22 @@ class Stastics:
 
         # Convert the lists to a DataFrame for better visualization
         results_df = pd.DataFrame({
-            'Correlated Variables': correlated_vars,
+            'Variable_1': var1,
+            'Variable_2': var2,
             'Correlation': corr,
             'P-value': pval,
             'N': num
         })
 
-        results_df=results_df.sort_values(by="Correlation").dropna().drop_duplicates(subset="Correlation").set_index("Correlated Variables")
+        results_df["Correlated Variables"]= results_df.Variable_1+" vs "+results_df.Variable_2
+
+        results_df=results_df.dropna().set_index("Correlated Variables")
+
+        # Apply the function to the indexes
+        results_df.index = results_df.index.map(self.order_comparisons)
+
+        # Eliminate duplicated indexes
+        results_df = results_df[~results_df.index.duplicated(keep='first')]
 
         results_df["FDR"] = sp.stats.false_discovery_control(results_df["P-value"],method = "bh")
 
