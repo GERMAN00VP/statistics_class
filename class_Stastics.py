@@ -5,7 +5,6 @@ import scipy as sp
 
 
 
-
 class Stastics:
 
     def __init__(self, data, metadata):
@@ -13,6 +12,12 @@ class Stastics:
         self.adata = ad.AnnData(data,obs=metadata)
 
         self.do_description()
+
+        self.dict_comp_1_1 = {"Comparisson":["Normal_Data","Test","P-value","Abs_Mean_Difference","Abs_Hodges_Lehmann_Estimator"]}
+
+        self.df_comp_1_1 = pd.DataFrame(self.dict_comp_1_1).T
+
+
     
     def do_description(self,name="All"):
         """_summary_
@@ -23,7 +28,6 @@ class Stastics:
 
         df = self.adata.obs
 
-        #for col in df_description_all_bg.columns:
         variables,condicion,cuenta,means,medians = [], [], [], [], []
 
         for col in df.columns:
@@ -62,10 +66,105 @@ class Stastics:
         self.adata.uns[f"Description_{name}"]= df_res
 
 
+    
+    def __check_normality(self ,values:pd.Series,condition=None):
+        """ A method that checks the normality of data:
+
+        Args:
+            values (pd.Series): the values to check.
+            condition (bool, optional): Whether there is a condition (check the normality of both conditions). Defaults to False.
+
+    
+
+        Returns:
+            : _description_
+
+        """
+
+
+        if type(condition)!="NoneType":
+
+            # Check the normality of every condition
+            return np.all([sp.stats.shapiro(values[condition.index[condition==i]].astype(float))[1]>0.05  for i in condition.unique()])
+        
+        # Check the normality of all values
+        return sp.stats.shapiro(values)[1]>0.05
+        
+
+
+
+    def __hodges_lehmann_estimator(self, group1, group2):
+        """
+        Calculate the Hodges-Lehmann estimator for two independent samples.
+        The Hodges-Lehmann estimator is the median of all pairwise differences 
+        between the observations in the two groups.
+
+        Parameters:
+        group1 (array-like): First sample
+        group2 (array-like): Second sample
+
+        Returns:
+        float: Hodges-Lehmann estimator
+        """
+
+        group1 = np.asarray(group1)
+        group2 = np.asarray(group2)
+        
+        # Compute all pairwise differences
+        diffs = []
+        for x in group1:
+            for y in group2:
+                diffs.append(x - y)
+        
+        # Return the median of differences
+        return np.median(diffs)
+
+    
+    def comparisons_1_1(self,target,condition_name:str):
+
+        df = self.adata.to_df()
+
+        values = df[target].dropna() # Extract the values (dropping missing values)
+
+        condition = self.adata.obs[condition_name][values.index]
+
+        normal= self.__check_normality(values,condition)
+
+        # Values splitted in two Series by condition
+
+        sep_values= [values[condition.index[condition==cond]].astype(float) for cond in condition.unique()]
+
+        if normal:
+
+            test= "T-test"
+
+            mean_dif = sep_values[0].mean() - sep_values[1].mean()
+
+            median_dif = np.nan
+
+            pval = sp.stats.ttest_ind(sep_values[0],sep_values[1])[1]
+        
+        else:
+
+            test= "Mann-Whitney U"
+
+            pval =  sp.stats.mannwhitneyu(sep_values[0],sep_values[1])[1]
+
+            mean_dif = np.nan
+
+            median_dif = self.__hodges_lehmann_estimator(sep_values[0], sep_values[1])
+        
+        self.dict_comp_1_1[f"{condition_name}: {target}"]= [normal,test,pval,mean_dif,median_dif]
+
+        self.df_comp_1_1= pd.DataFrame(self.dict_comp_1_1).set_index("Comparisson").T
+
+        return self.df_comp_1_1
+
+
 
 
     # Método para calcular la matriz de correlaciones
-    def __correlations(self,df1,df2,name,method='spearman'):
+    def __correlations(self,df1,df2,name,method='spearman',save_in="varm"):
 
         # Inicializar la matriz de correlaciones
         corr_matrix = pd.DataFrame(index=df1.columns, columns=df2.columns)
@@ -91,17 +190,38 @@ class Stastics:
                 corr_matrix.loc[col1, col2] = corr
                 pval_matrix.loc[col1, col2] = pval
                 n_matrix.loc[col1, col2]= len(intersection_indexes)
+
+        if save_in=="varm":
         
-        self.adata.varm[f"{name}_Corr"] = corr_matrix
-        self.adata.varm[f"{name}_Corr_pval"] = pval_matrix
-        self.adata.varm[f"{name}_Corr_N"] = n_matrix
+            self.adata.varm[f"{name}_Corr"] = corr_matrix
+            self.adata.varm[f"{name}_Corr_pval"] = pval_matrix
+            self.adata.varm[f"{name}_Corr_N"] = n_matrix
+
+        elif save_in=="uns":
+            self.adata.uns[f"{name}_Corr"] = corr_matrix
+            self.adata.uns[f"{name}_Corr_pval"] = pval_matrix
+            self.adata.uns[f"{name}_Corr_N"] = n_matrix
+
+        else:
+            print("This is not a suitable place for storing the data")
     
-    def correlations_metadata(self):
+
+    
+    def correlations_metadata(self,save_in="uns"):
+
+        df1 = self.adata.obs
+        df2 = self.adata.obs
+
+        self.__correlations(df1,df2,name="Metadata_Metadata",save_in=save_in)
+
+    
+    def correlations_metadata_variables(self):
 
         df1 = self.adata.to_df()
         df2 = self.adata.obs
 
         self.__correlations(df1,df2,name="Variables_Metadata")
+
 
     def correlations_variables(self):
 
@@ -110,7 +230,8 @@ class Stastics:
 
         self.__correlations(df1,df2,name="Variables_Variables")
 
-    def generate_corr_report(self,name="Variables_Variables"):
+
+    def generate_corr_report(self,name="Variables_Variables",save_in="varm"):
 
         """
         Description: This method generates a report from a correlation analysis previously run.
@@ -123,22 +244,27 @@ class Stastics:
             report: (pd.DataFrame)
         """
 
+        if save_in=="varm":
+
+            matrix_dict = self.adata.varm
+
+        else: 
+
+            matrix_dict = self.adata.uns
+
 
         correlated_vars,corr,pval,num = [], [], [], []
 
-        df_bool = self.adata.varm[f"{name}_Corr"]<0.999  # A dataframe that indicates the self correlation variables
-
-        
-
+        df_bool = matrix_dict[f"{name}_Corr"]<0.999  # A dataframe that indicates the self correlation variables
 
         for col in df_bool.columns:
 
             for term in df_bool.index[df_bool[col]].tolist():
 
                 correlated_vars.append(f"{col} vs {term}")
-                corr.append(self.adata.varm[f"{name}_Corr"].loc[term,col])
-                pval.append(self.adata.varm[f"{name}_Corr_pval"].loc[term,col])
-                num.append(self.adata.varm[f"{name}_Corr_N"].loc[term,col])
+                corr.append(matrix_dict[f"{name}_Corr"].loc[term,col])
+                pval.append(matrix_dict[f"{name}_Corr_pval"].loc[term,col])
+                num.append(matrix_dict[f"{name}_Corr_N"].loc[term,col])
 
 
         # Convert the lists to a DataFrame for better visualization
@@ -153,9 +279,12 @@ class Stastics:
 
         results_df["FDR"] = sp.stats.false_discovery_control(results_df["P-value"],method = "bh")
 
+        results_df["Significative"] = results_df["FDR"]<0.05
+
         self.adata.uns[f"{name}_Corr_report"] = results_df
 
         return results_df
+    
     
     def chi_sq(self, col:str, expected_proportions = [0.5, 0.5]):
 
@@ -177,3 +306,4 @@ class Stastics:
             print(f"La proporción de cuentas de las variables de la columna {col} se desvía significativamente del lo esperado.")
         else:
             print(f"La proporción de cuentas de las variables de la columna {col} no se desvía significativamente del lo esperado.")
+
