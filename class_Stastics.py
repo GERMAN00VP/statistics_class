@@ -17,15 +17,26 @@ class Stastics:
 
 
     
-    def do_description(self,name="All"):
+    def do_description(self,name="All",subset="All"):
 
         """_summary_
 
         Args:
             name (str, optional): Name to be saved with in the adata.uns object. Defaults to "All".
+            subset (tuple, optional): Defaults to "All". 
+                If provided, creates a subset of the observations by a column fo the metadata and a value for this column.Ej: (Group, control)
+
         """
 
         df = self.adata.obs
+
+        if subset!= "All":
+
+            samples = self.adata.obs[self.adata.obs[subset[0]]==subset[1]].index
+
+            df = self.adata.obs.loc[samples]
+
+        
 
         variables,condicion,cuenta,means,medians = [], [], [], [], []
 
@@ -67,6 +78,7 @@ class Stastics:
 
     
     def __check_normality(self ,values:pd.Series,condition=None):
+
         """ A method that checks the normality of data:
 
         Args:
@@ -76,7 +88,7 @@ class Stastics:
     
 
         Returns:
-            : _description_
+            Boolean, true if normal data.
 
         """
 
@@ -119,6 +131,15 @@ class Stastics:
 
     
     def comparisons_1_1(self,target,condition_name:str):
+        """Do the t student or Mann Whitney Comparisons between twoo variables
+
+        Args:
+            target (_type_): _description_
+            condition_name (str): _description_
+
+        Returns:
+            _type_: _description_
+        """
 
         df = self.adata.to_df()
 
