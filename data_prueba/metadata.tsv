@@ -1,0 +1,87 @@
+Número participante	Grupo de estudio	Tipo inmunodeprimido	En TPH: Quimera completa	En TPH: EICH	Sexo	Raza	Peso (kg)	Talla (cm)	Medicación previa: ALEMTUZUMAB en los últimos 24 meses	Medicación previa: ATG en los últimos 12 meses	Medicación previa: RITUXIMAB en los últimos 12 meses	Medicación en el momento de la inclusión: CORTICOIDES	Medicación en el momento de la inclusión: TACROLIMUS	Medicación en el momento de la inclusión: SIROLIMUS	Medicación en el momento de la inclusión: CICLOSPORINA	Medicación en el momento de la inclusión: RUXOLITINIB	Medicación en el momento de la inclusión: ABATACEPT	Medicación en el momento de la inclusión: METROTEXATO	Medicación en el momento de la inclusión: MICOFENOLATO	Medicación en el momento de la inclusión: AZATIOPRINA	Medicación en el momento de la inclusión: GAMMAGLOBULINA	INMUNOSUPRESIÓN DE ALTO GRADO	Edad (años)	Tiempo desde trasplante (meses)
+01-001	Control sano				Hombre	Caucásico	26.0	131.0															10.0	
+01-002	Control sano				Hombre	Caucásico	47.0	165.0															13.0	
+01-003	Control sano				Hombre	Caucásico	31.8	139.2															10.0	
+01-004	Control sano				Mujer	Caucásico	32.0	143.0															11.0	
+01-005	Control sano				Hombre	Caucásico	32.0	145.0															11.0	
+01-006	Control sano				Hombre	Caucásico	54.0	169.0															12.0	
+01-007	Control sano				Mujer	Caucásico	43.0	153.0															12.0	
+01-008	Control sano				Hombre	Caucásico	26.5	132.0															10.0	
+01-009	Control sano				Hombre	Caucásico	68.0	174.5															14.0	
+01-010	Control sano				Mujer	Caucásico	33.0	150.0															11.0	
+01-011	Control sano				Hombre	Caucásico	52.0	168.0															14.0	
+01-012	Control sano				Hombre	Caucásico	40.2	158.0															12.0	
+01-013	Control sano				Hombre	Caucásico	37.6	150.5															12.0	
+01-014	Control sano				Mujer	Caucásico	28.8	140.0															9.0	
+01-015	Control sano				Hombre	Caucásico	39.7	152.0															11.0	
+01-016	Inmunodeprimidos (VIH, TMCH, TOS, PCT)	Receptores de trasplante de células madre hematopoyéticas (TCMH) - HETEROLOGO	No	No	Hombre	Caucásico	42.0	131.0	No	No	No	No	No	No	No	No	No	No	No	No	No	No	13.0	94.0
+01-017	Control sano				Hombre	Caucásico	49.7	167.0															14.0	
+01-018	Control sano				Hombre	Caucásico	50.2	164.0															13.0	
+01-019	Inmunodeprimidos (VIH, TMCH, TOS, PCT)	Receptores de trasplante de células madre hematopoyéticas (TCMH) - HETEROLOGO	No	Si	Hombre	Árabe	30.5	145.0	No	No	No	No	No	No	No	No	No	No	No	No	No	No	13.0	130.0
+01-020	Control sano				Hombre	Caucásico	38.5	151.0															13.0	
+01-021	Control sano				Hombre	Caucásico	52.3	159.0															13.0	
+01-022	Control sano				Hombre	Caucásico	62.75	179.0															14.0	
+01-023	Control sano				Hombre	Caucásico	43.8	164.8															14.0	
+01-024	Inmunodeprimidos (VIH, TMCH, TOS, PCT)	VIH			Hombre	Negro o africano americano	33.5	137.5	No	No	No	No	No	No	No	No	No	No	No	No	No	No	10.0	
+01-025	Inmunodeprimidos (VIH, TMCH, TOS, PCT)	Pacientes posquimioterapia (PCT)			Hombre	Caucásico	44.4	155.0	No	No	No	No	No	No	No	No	No	No	No	No	No	No	15.0	12.0
+01-026	Control sano				Hombre	Latino	50.5	163.0															14.0	
+01-027	Control sano				Hombre	Caucásico	44.0	143.5															10.0	
+01-028	Control sano				Hombre	Caucásico	54.2	167.0															14.0	
+01-029	Control sano				Hombre	Caucásico	58.0	155.0															12.0	
+01-030	Inmunodeprimidos (VIH, TMCH, TOS, PCT)	Receptores de trasplante de células madre hematopoyéticas (TCMH) - HETEROLOGO	Si	Si	Mujer	Caucásico	31.7	135.0	No	No	No	No	No	No	No	No	No	No	No	No	No	No	13.0	18.0
+01-031	Inmunodeprimidos (VIH, TMCH, TOS, PCT)	Receptores de trasplante de células madre hematopoyéticas (TCMH) - HETEROLOGO	Si	Si	Hombre	Caucásico	67.3	165.0	No	No	No	No	No	No	No	No	No	No	No	No	No	No	14.0	24.0
+01-032	Inmunodeprimidos (VIH, TMCH, TOS, PCT)	Receptores de trasplante de células madre hematopoyéticas (TCMH) - HETEROLOGO	Si	Si	Mujer	Caucásico	55.4	172.0	No	No	No	No	No	No	No	No	No	No	No	No	No	No	17.0	36.0
+01-033	Control sano				Mujer	Caucásico	27.0	126.5															9.0	
+01-034	Inmunodeprimidos (VIH, TMCH, TOS, PCT)	Pacientes posquimioterapia (PCT)			Hombre	Caucásico	61.0	171.6	No	No	No	No	No	No	No	No	No	No	No	No	No	No	17.0	126.0
+01-035	Inmunodeprimidos (VIH, TMCH, TOS, PCT)	Receptores de trasplante de órgano sólido (TOS) - RIÑÓN			Hombre	Caucásico	51.5	161.0	No	No	No	No	Si	Si	No	No	No	No	No	No	No	No	14.0	135.0
+01-036	Inmunodeprimidos (VIH, TMCH, TOS, PCT)	Pacientes posquimioterapia (PCT)			Mujer	Caucásico	58.5	166.0	No	No	No	No	No	No	No	No	No	No	No	No	No	No	14.0	15.0
+01-037	Inmunodeprimidos (VIH, TMCH, TOS, PCT)	Receptores de trasplante de órgano sólido (TOS) - RIÑÓN			Hombre	Caucásico	58.1	173.0															17.0	60.0
+01-039	Inmunodeprimidos (VIH, TMCH, TOS, PCT)	Receptores de trasplante de células madre hematopoyéticas (TCMH) - AUTOLOGO	No	No	Hombre	Caucásico	38.5	152.0	No	No	No	No	No	No	No	No	No	No	No	No	No	No	12.0	67.0
+01-040	Inmunodeprimidos (VIH, TMCH, TOS, PCT)	VIH			Hombre	Caucásico	62.0	155.5	No	No	No	No	No	No	No	No	No	No	No	No	No	No	13.0	
+01-041	Inmunodeprimidos (VIH, TMCH, TOS, PCT)	Receptores de trasplante de órgano sólido (TOS) - HÍGADO			Hombre	Caucásico	44.0	160.0	No	No	No	Si	Si	No	No	No	No	No	Si	No	No	Si	16.0	196.0
+01-042	Control sano				Hombre	Caucásico	64.4	159.6															13.0	
+01-043	Control sano				Hombre	Latino	40.6	160.0															13.0	
+01-044	Control sano				Hombre	Latino	57.5	171.0															14.0	
+01-045	Inmunodeprimidos (VIH, TMCH, TOS, PCT)	Receptores de trasplante de órgano sólido (TOS) - RIÑÓN			Mujer	Latino	56.6	147.4	No	No	No	Si	Si	No	No	No	No	No	Si	No	No	Si	15.0	36.0
+01-046	Inmunodeprimidos (VIH, TMCH, TOS, PCT)	Receptores de trasplante de órgano sólido (TOS) - PULMONAR			Hombre	Latino	45.7	157.5	No	No	No	Si	Si	No	No	No	No	No	Si	No	No		15.0	32.0
+01-047	Inmunodeprimidos (VIH, TMCH, TOS, PCT)	Receptores de trasplante de órgano sólido (TOS) - HÍGADO			Hombre	Caucásico	64.6	175.0	No	No	No	Si	Si	No	No	No	No	No	No	No	No	No	13.0	154.0
+01-048	Control sano				Hombre	Caucásico	64.6	173.0	No	No	No	No	No	No	No	No	No	No	No	No	No	No	15.0	
+01-049	Inmunodeprimidos (VIH, TMCH, TOS, PCT)	Receptores de trasplante de células madre hematopoyéticas (TCMH) - HETEROLOGO	No	Si	Mujer	Caucásico	23.2	126.0	No	No	No	No	No	No	No	No	No	No	No	No	No	No	9.0	106.0
+01-050	Inmunodeprimidos (VIH, TMCH, TOS, PCT)	Receptores de trasplante de órgano sólido (TOS) - RIÑÓN			Hombre	Caucásico	25.0	126.0	No	No	No	Si	Si	Si	No	No	No	No	No	No	No	No	9.0	55.0
+01-051	Inmunodeprimidos (VIH, TMCH, TOS, PCT)	Pacientes posquimioterapia (PCT)			Hombre	Caucásico	39.0	163.5	No	No	No	No	No	No	No	No	No	No	No	No	No	No	13.0	10.0
+01-052	Inmunodeprimidos (VIH, TMCH, TOS, PCT)	Receptores de trasplante de órgano sólido (TOS) - RIÑÓN			Hombre	Caucásico	42.5	131.5	No	No	No	No	Si	No	No	No	No	No	Si	No	No	No	9.0	9.0
+01-053	Inmunodeprimidos (VIH, TMCH, TOS, PCT)	Pacientes posquimioterapia (PCT)			Mujer	Caucásico	34.0	140.0	No	No	No	No	No	No	No	No	No	No	No	No	No	No	10.0	8.0
+01-054	Inmunodeprimidos (VIH, TMCH, TOS, PCT)	Receptores de trasplante de células madre hematopoyéticas (TCMH) - HETEROLOGO	Si	No	Mujer	Caucásico	31.4	135.0	No	No	Si	No	No	No	No	No	No	No	No	No	No	No	11.0	23.0
+01-056	Inmunodeprimidos (VIH, TMCH, TOS, PCT)	Pacientes posquimioterapia (PCT)			Hombre	Asiático	77.0	168.0	No	No	No	No	No	No	No	No	No	No	No	No	No	No	17.0	111.0
+01-057	Inmunodeprimidos (VIH, TMCH, TOS, PCT)	Receptores de trasplante de órgano sólido (TOS) - HÍGADO			Hombre	Caucásico	58.5	173.5	No	No	No	No	Si	No	No	No	No	No	Si	No	No	No	17.0	
+01-058	Inmunodeprimidos (VIH, TMCH, TOS, PCT)	Receptores de trasplante de órgano sólido (TOS) - RIÑÓN			Mujer	Caucásico	29.0	128.0	No	No	No	Si	No	No	No	No	No	No	No	No	No	No	10.0	63.0
+01-059	Inmunodeprimidos (VIH, TMCH, TOS, PCT)	Receptores de trasplante de órgano sólido (TOS) - RIÑÓN			Hombre	Caucásico	32.0	139.0	No	No	No	Si	Si	No	No	No	No	No	No	No	No	No	11.0	12.0
+01-060	Inmunodeprimidos (VIH, TMCH, TOS, PCT)	Receptores de trasplante de órgano sólido (TOS) - RIÑÓN			Hombre	Caucásico	27.2	131.0	No	No	No	Si	Si	No	No	No	No	No	Si	No	No	No	10.0	20.0
+01-061	Inmunodeprimidos (VIH, TMCH, TOS, PCT)	Pacientes posquimioterapia (PCT)			Hombre	Caucásico	86.6	176.0	No	No	No	No	No	No	No	No	No	No	No	No	No	No	15.0	124.0
+01-062	Inmunodeprimidos (VIH, TMCH, TOS, PCT)	Receptores de trasplante de células madre hematopoyéticas (TCMH) - HETEROLOGO	No	No	Mujer	Latino	48.5	147.5	Si	Si	No	No	No	No	No	No	No	No	No	No	No	No	9.0	
+01-063	Inmunodeprimidos (VIH, TMCH, TOS, PCT)	Receptores de trasplante de células madre hematopoyéticas (TCMH) - HETEROLOGO	Si	Si	Mujer	Latino	42.0	146.0	No	No	No	No	No	No	No	No	No	No	No	No	No	No	11.0	20.0
+01-064	Inmunodeprimidos (VIH, TMCH, TOS, PCT)	Receptores de trasplante de órgano sólido (TOS) - CARDIO			Hombre	Caucásico	41.5	144.5	No	No	No	Si	Si	No	No	No	No	No	Si	No	No	Si	13.0	82.0
+01-065	Inmunodeprimidos (VIH, TMCH, TOS, PCT)	Receptores de trasplante de órgano sólido (TOS) - HÍGADO			Hombre	Caucásico	46.2	163.0	No	No	No	Si	Si	No	No	No	No	No	No	No	No	No	15.0	180.0
+01-066	Control sano				Hombre	Caucásico	50.0	168.0															14.0	
+01-067	Inmunodeprimidos (VIH, TMCH, TOS, PCT)	Receptores de trasplante de órgano sólido (TOS) - RIÑÓN			Hombre	Caucásico	57.7	163.0	No	No	No	No	Si	Si	No	No	No	No	No	No	No	No	16.0	143.0
+01-068	Inmunodeprimidos (VIH, TMCH, TOS, PCT)	Receptores de trasplante de células madre hematopoyéticas (TCMH) - HETEROLOGO	Si	No	Hombre	Latino	44.5	157.0	No	No	No	No	No	No	No	No	No	No	No	No	No		16.0	37.0
+01-069	Inmunodeprimidos (VIH, TMCH, TOS, PCT)	Receptores de trasplante de células madre hematopoyéticas (TCMH) - HETEROLOGO	Si	Si	Hombre	Caucásico	64.0	150.1	No	No	No	Si	No	No	No	No	No	No	No	No	No	No	14.0	50.0
+01-070	Inmunodeprimidos (VIH, TMCH, TOS, PCT)	Pacientes posquimioterapia (PCT)			Hombre	Caucásico	53.5	166.0	No	No	No	Si	No	No	No	No	No	No	No	No	No	No	16.0	71.0
+01-071	Inmunodeprimidos (VIH, TMCH, TOS, PCT)	Receptores de trasplante de órgano sólido (TOS) - CARDIO			Hombre	Caucásico	20.0	128.0	No	No	No	No	No	No	Si	No	No	No	No	Si	No	No	9.0	105.0
+01-072	Inmunodeprimidos (VIH, TMCH, TOS, PCT)	Receptores de trasplante de órgano sólido (TOS) - RIÑÓN			Mujer	Caucásico	72.4	146.8	No	No	No	Si	Si	No	No	No	No	No	Si	No	No	No	12.0	6.0
+01-074	Inmunodeprimidos (VIH, TMCH, TOS, PCT)	Receptores de trasplante de órgano sólido (TOS) - RIÑÓN			Hombre	Caucásico	59.5	173.5	No	No	No	No	Si	No	No	No	No	No	Si	No	No	Si	15.0	19.0
+01-075	Inmunodeprimidos (VIH, TMCH, TOS, PCT)	Pacientes posquimioterapia (PCT)			Mujer	Caucásico	33.5	138.0	No	No	No	No	No	No	No	No	No	No	No	No	No	No	8.0	-10.0
+01-076	Control sano				Hombre	Caucásico	52.0	165.0	No	No	No	No	No	No	No	No	No	No	No	No	No	No	14.0	
+01-077	Inmunodeprimidos (VIH, TMCH, TOS, PCT)	Pacientes posquimioterapia (PCT)			Hombre	Caucásico	55.6	148.5	No	No	No	No	No	No	No	No	No	No	No	No	No	No	13.0	7.0
+01-078	Inmunodeprimidos (VIH, TMCH, TOS, PCT)	Pacientes posquimioterapia (PCT)			Hombre	Caucásico	68.0	171.0	No	No	No	No	No	No	No	No	No	No	No	No	No	No	15.0	110.0
+01-079	Inmunodeprimidos (VIH, TMCH, TOS, PCT)	Pacientes posquimioterapia (PCT)			Hombre	Caucásico	43.0	155.0	No	No	No	No	No	No	No	No	No	No	No	No	No	No	12.0	
+01-080	Inmunodeprimidos (VIH, TMCH, TOS, PCT)	Pacientes posquimioterapia (PCT)			Hombre	Caucásico	62.5	171.5	No	No	No	No	No	No	No	No	No	No	No	No	No	No	14.0	98.0
+01-081	Inmunodeprimidos (VIH, TMCH, TOS, PCT)	Receptores de trasplante de órgano sólido (TOS) - MULTIVISCERAL			Hombre	Caucásico	58.8	182.0	No	No	No	Si	Si	No	No	No	No	No	No	No	No	No	17.0	7.0
+01-082	Control sano	VIH			Hombre	Latino	47.0	162.5	No	No	No	No	No	No	No	No	No	No	No	No	No	No	13.0	
+01-083	Inmunodeprimidos (VIH, TMCH, TOS, PCT)	Receptores de trasplante de órgano sólido (TOS) - RIÑÓN			Hombre	Caucásico	42.7	150.0	No	No	No	No	Si	Si	No	No	No	No	No	No	No	No	11.0	
+01-084	Inmunodeprimidos (VIH, TMCH, TOS, PCT)	Pacientes posquimioterapia (PCT)			Hombre	Caucásico	65.0	171.5	No	No	No	No	No	No	No	No	No	No	No	No	No	No	17.0	86.0
+01-085	Inmunodeprimidos (VIH, TMCH, TOS, PCT)	Pacientes posquimioterapia (PCT)			Hombre	Caucásico	31.0	129.3	No	No	No	No	No	No	No	No	No	No	No	No	No	No	11.0	
+01-086	Inmunodeprimidos (VIH, TMCH, TOS, PCT)	Pacientes posquimioterapia (PCT)			Mujer	Caucásico	25.9	137.5	No	No	No	No	No	No	No	No	No	No	No	No	No	No	11.0	6.0
+01-087	Inmunodeprimidos (VIH, TMCH, TOS, PCT)	Receptores de trasplante de células madre hematopoyéticas (TCMH) - HETEROLOGO	Si	No	Mujer	Caucásico	40.0	134.5	Si	Si	Si	Si	No	No	Si	No	No	No	No	No	No	Si	10.0	6.0
+01-088	Inmunodeprimidos (VIH, TMCH, TOS, PCT)	Pacientes posquimioterapia (PCT)			Hombre	Caucásico	70.8	182.0	No	No	No	No	No	No	No	No	No	No	No	No	No	No	17.0	17.0
+01-089	Inmunodeprimidos (VIH, TMCH, TOS, PCT)	Pacientes posquimioterapia (PCT)			Hombre	Caucásico	51.8	175.0	No	No	No	No	No	No	No	No	No	No	No	No	No	No	16.0	121.0

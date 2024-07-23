@@ -2,6 +2,8 @@ import pandas as pd
 import anndata as ad
 import numpy as np
 import scipy as sp
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 class Stastics:
 
@@ -345,4 +347,70 @@ class Stastics:
             print(f"La proporción de cuentas de las variables de la columna {col} se desvía significativamente del lo esperado.")
         else:
             print(f"La proporción de cuentas de las variables de la columna {col} no se desvía significativamente del lo esperado.")
+
+
+
+    def plot_differences(self, condition ,varsname = " ",vars = "All", kind = "Violin",save=False,ylab = "",show=False):
+        """Method to do violin or boxplots comparing different states of the data
+
+        Args:
+            condition (str): The condition to compare the variables by.
+            varsname (str, optional): The name of the variables, appars in the x label. Defaults to " ".
+            vars (str, optional): Name of the variables to compare (list, np.array or pd.Series). Defaults to "All".
+            kind (str, optional): Box for boxplot. Defaults to "Violin".
+            save (bool, optional): path to save the figure. Defaults to False.
+            ylab (str, optional): label of the y axe. Defaults to "".
+            show (bool, optional): whether to show the plot or close it directly.
+
+        Raises:
+            AttributeError: If someone requests an other kind of plot
+        """
+
+        
+        if isinstance(vars, str) and vars == "All": # In case of defoult all variables are selected
+            vars = self.adata.var_names
+            df_var = self.adata.to_df()[vars]
+        
+        elif isinstance(vars, str): # In case a single variable is selected
+            df_var = self.adata.to_df()[vars].to_frame()
+
+        else: # The user selects some of the variables
+            df_var = self.adata.to_df()[vars]
+            
+        df_var[condition] = df_var.index.map(dict(zip(self.adata.obs.index,self.adata.obs[condition])))
+        df_var = df_var.melt(id_vars=condition,value_name="value",var_name=varsname)
+
+        
+        # Crear el plot
+        plt.figure(figsize=(10, 6))
+
+        if kind=="Violin":
+            sns.violinplot(x=varsname, y= "value", data=df_var, inner='quart', hue=condition, split=False)
+
+        elif kind=="Box":
+            sns.boxplot(x=varsname, y= "value", data=df_var,  hue=condition)
+        
+        else:
+            print("Option not implemetnted yet")
+            raise AttributeError
+        
+        sns.stripplot(x=varsname, y="value", data=df_var, hue=condition, dodge=True, jitter=True, color='k', alpha=0.5,legend=False)
+
+
+        # Añadir títulos y etiquetas
+        plt.xlabel(varsname)
+        plt.ylabel(ylab)
+        plt.xticks(rotation=25, ha='right')
+
+        # Colocar la leyenda
+        plt.legend(title=condition,loc='best')
+
+        if save:
+            plt.savefig(save,bbox_inches="tight")
+
+        if show:
+            plt.show()
+
+        else:
+            plt.close()       
 
