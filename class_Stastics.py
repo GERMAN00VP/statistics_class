@@ -388,7 +388,9 @@ class Stastics:
             sns.violinplot(x=varsname, y= "value", data=df_var, inner='quart', hue=condition, split=False)
 
         elif kind=="Box":
-            sns.boxplot(x=varsname, y= "value", data=df_var,  hue=condition)
+            sns.boxplot(x=varsname, y= "value", data=df_var,  hue=condition,fliersize=0)
+            # Mejorar la estética
+            plt.grid(True, which='both', linestyle='--', linewidth=0.5)  # Añadir una cuadrícula sutil
         
         else:
             print("Option not implemetnted yet")
@@ -402,8 +404,16 @@ class Stastics:
         plt.ylabel(ylab)
         plt.xticks(rotation=25, ha='right')
 
+        # Si solo hay una variable no mostrar los ticks
+        if len(df_var[varsname].unique())==1:
+            plt.xticks([])
+
+
         # Colocar la leyenda
         plt.legend(title=condition,loc='best')
+
+        
+        sns.despine()
 
         if save:
             plt.savefig(save,bbox_inches="tight")
