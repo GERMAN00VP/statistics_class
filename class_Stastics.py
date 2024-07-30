@@ -396,9 +396,24 @@ class Stastics:
         df_bool = matrix_dict[f"{name}_Corr"]<0.999  # A dataframe that indicates the self correlation variables
 
         if select_vars!=None:
-             df_bool=df_bool[select_vars]
-             
 
+            okay = False
+
+            select_vars = set(select_vars)
+
+            cols = list(select_vars.intersection(df_bool.columns))
+
+            if len(cols)>0:
+                df_bool=df_bool[cols]
+                okay = True
+            
+            rows = list(select_vars.intersection(df_bool.index))
+
+            if len(rows)>0:
+                df_bool=df_bool.loc[rows]
+                okay = True
+
+            assert okay, "The variables selected doesn`t belong to this correlation matrix"
 
 
         for col in df_bool.columns:
@@ -431,15 +446,19 @@ class Stastics:
         # Eliminate duplicated indexes
         results_df = results_df[~results_df.index.duplicated(keep='first')]
 
+        # Do the false discover rate control
         results_df["FDR"] = sp.stats.false_discovery_control(results_df["P-value"],method = "bh")
 
         results_df["Significative"] = results_df["FDR"]<0.05
 
+        # In case we selected 
         if select_vars!=None:
              
-            prefix = 1+ max([int(i.split("_")[0]) if i.split("_")[0].isdigit() else 0 for i in stat.adata.uns.keys()])
+            prefix = 1+ max([int(i.split("_")[0]) if i.split("_")[0].isdigit() else 0 for i in self.adata.uns.keys()])
             
             name = f"{prefix}_Selection"
+
+            # If the report hasnt been generated yet
         
             if np.all(np.array([self.adata.uns[result].index.tolist() !=results_df.index.tolist() for result in self.adata.uns.keys()])):
 
@@ -549,6 +568,7 @@ class Stastics:
 
         else:
             plt.close()  
+
 
     def plot_correlation(self, var1 ,var2, save=False,show=False):
         
