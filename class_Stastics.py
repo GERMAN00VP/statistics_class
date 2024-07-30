@@ -397,23 +397,22 @@ class Stastics:
 
         if select_vars!=None:
 
-            okay = False
+            
 
             select_vars = set(select_vars)
+
+            assert len(select_vars.intersection(set(df_bool.columns.tolist()+df_bool.index.tolist()))) == len(select_vars), "One or more variables not found in the correlation matrix"
 
             cols = list(select_vars.intersection(df_bool.columns))
 
             if len(cols)>0:
                 df_bool=df_bool[cols]
-                okay = True
             
             rows = list(select_vars.intersection(df_bool.index))
 
             if len(rows)>0:
                 df_bool=df_bool.loc[rows]
-                okay = True
 
-            assert okay, "The variables selected doesn`t belong to this correlation matrix"
 
 
         for col in df_bool.columns:
