@@ -11,11 +11,118 @@ class Stastics:
 
         self.adata = ad.AnnData(data,obs=metadata)
 
+        # Removal of the duplicated columns
+        self.adata.obs = self.adata.obs.T.drop_duplicates().T
+
+
+        # Automatic detection of the column type
+        self.adata.obs = self.adata.obs.astype(self.adata.obs.apply(self.identify_column_type))
+
+        # Create an initial description file
         self.do_description()
+
 
         self.dict_comp_1_1 = {"Comparisson":["Normal_Data","Test","P-value","Mean_Difference","Hodges_Lehmann_Estimator"]}
 
         self.df_comp_1_1 = pd.DataFrame(self.dict_comp_1_1).T
+
+    def filter(self,var_name,subgroup="DROPNAS"):
+
+        """Method that can filter the adata object by a variable of data or metadata
+
+        Args:
+            var_name (str): A column of metadata or data to filter by.
+
+            subgroup (str|list, optional): List of values from the selected variable to be kept . Defaults to "DROPNAS", in that case removes all the obs that contains np.nan values for the selected variable.
+
+        Raises:
+            ValueError: If subgroup isnt DROPNAS or a list of values.
+            KeyError: If the var_name isnt a column of data or metadata.
+        """
+
+        if var_name in self.adata.obs.columns: # Filter by metadata
+
+            if subgroup=="DROPNAS": # Filter out the missing values by var_name
+
+                indexes = self.adata.obs.dropna(subset=var_name).index
+
+                # Keep the non missing values observations for this variable of metadata
+                self.adata[indexes,:]
+
+            elif type(subgroup)==list: # Filter out the  values not in subgroup of the var_name column
+
+                indexes= self.adata.obs_names[self.adata.obs[var_name].isin(subgroup)]
+
+            else:
+
+                print(f"Subgroup must be a list or leave empty, not {type(subgroup)}")
+
+                raise ValueError
+            
+
+
+        elif var_name in self.adata.var_names:  # Filter by variables
+
+            if subgroup=="DROPNAS":# Filter out the missing values by var_name
+
+                indexes = self.adata.to_df().dropna(subset=var_name).index
+
+            elif type(subgroup)==list: # Filter out the  values not in subgroup of the var_name column
+
+                indexes= self.adata.obs_names[self.adata.to_df()[var_name].isin(subgroup)]
+
+            else:
+
+                print(f"Subgroup must be a list or leave empty, not {type(subgroup)}")
+
+        else:
+
+            print(f"The var_name '{var_name}' isn`t a column of data or metadata")
+            raise KeyError
+
+        if len(indexes)==0:
+
+            print("Any of the observations meet the desired filtering conditions.\nThe filtering won`t be performed.")
+
+        else:        
+            # Do the filtering
+            self.adata = self.adata[indexes,:]
+
+            # Regenerate the description with the new data
+            self.do_description()
+
+
+
+    def identify_column_type(self,series):
+        unique_values = len(series.unique())
+        total_values = len(series)
+        
+        # Definir un umbral heurístico
+        unique_ratio = unique_values / total_values
+    
+        # Umbral para considerar como continuo vs categórico
+        if unique_ratio < 0.1:
+            return object
+        
+        else:
+            return float
+        
+    def find_var(self,var):
+
+        if var in self.adata.obs.columns:
+            
+            variable = self.adata.obs[var]
+
+
+        elif var in self.adata.var_names:
+
+            variable = self.adata.to_df()[var]
+
+        else:
+            print(f"The variable '{var} can`t be found in the anndata object" )
+            raise KeyError
+        
+        return variable
 
 
     
@@ -262,7 +369,7 @@ class Stastics:
         return " vs ".join(parts)
 
 
-    def generate_corr_report(self,name="Variables_Variables",save_in="varm"):
+    def generate_corr_report(self,name="Variables_Metadata",save_in="varm",select_vars = None):
 
         """
         Description: This method generates a report from a correlation analysis previously run.
@@ -280,13 +387,19 @@ class Stastics:
             matrix_dict = self.adata.varm
 
         else: 
-
             matrix_dict = self.adata.uns
+        
 
 
         var1,var2,corr,pval,num = [], [], [], [], []
 
         df_bool = matrix_dict[f"{name}_Corr"]<0.999  # A dataframe that indicates the self correlation variables
+
+        if select_vars!=None:
+             df_bool=df_bool[select_vars]
+             
+
+
 
         for col in df_bool.columns:
 
@@ -322,7 +435,20 @@ class Stastics:
 
         results_df["Significative"] = results_df["FDR"]<0.05
 
-        self.adata.uns[f"{name}_Corr_report"] = results_df
+        if select_vars!=None:
+             
+            prefix = 1+ max([int(i.split("_")[0]) if i.split("_")[0].isdigit() else 0 for i in stat.adata.uns.keys()])
+            
+            name = f"{prefix}_Selection"
+        
+            if np.all(np.array([self.adata.uns[result].index.tolist() !=results_df.index.tolist() for result in self.adata.uns.keys()])):
+
+                self.adata.uns[f"{name}_Corr_report"] = results_df
+                
+        else:
+            self.adata.uns[f"{name}_Corr_report"] = results_df          
+
+        
 
         return results_df
     
@@ -413,6 +539,32 @@ class Stastics:
         plt.legend(title=condition,loc='best')
 
         
+        sns.despine()
+
+        if save:
+            plt.savefig(save,bbox_inches="tight")
+
+        if show:
+            plt.show()
+
+        else:
+            plt.close()  
+
+    def plot_correlation(self, var1 ,var2, save=False,show=False):
+        
+        variable1 = self.find_var(var1)
+        variable2 = self.find_var(var2)
+
+        df_plot = pd.DataFrame([variable1,variable2]).T
+
+        # Crear el plot
+        plt.figure(figsize=(10, 6))
+        
+        sns.scatterplot(x=var1, y=var2, data=df_plot)
+
+        plt.grid(True, which='both', linestyle='--', linewidth=0.5)  # Añadir una cuadrícula sutil
+
+
         sns.despine()
 
         if save:
