@@ -5,7 +5,10 @@ import scipy as sp
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+
+
 class Stastics:
+
 
     def __init__(self, data, metadata):
 
@@ -16,15 +19,106 @@ class Stastics:
 
 
         # Automatic detection of the column type
-        self.adata.obs = self.adata.obs.astype(self.adata.obs.apply(self.identify_column_type))
+        self.adata.obs = self.adata.obs.astype(self.adata.obs.apply(self.__identify_column_type))
 
         # Create an initial description file
         self.do_description()
 
 
-        self.dict_comp_1_1 = {"Comparisson":["Normal_Data","Test","P-value","Mean_Difference","Hodges_Lehmann_Estimator"]}
+        self.dict_comp_1_1 = {"Comparison":["Normal_Data","Test","P-value","Mean_Difference","Hodges_Lehmann_Estimator"]}
 
         self.df_comp_1_1 = pd.DataFrame(self.dict_comp_1_1).T
+
+
+    def __identify_column_type(self, series):
+        """
+        Identifies the type of a pandas Series as either categorical or continuous.
+
+        Parameters:
+        series (pd.Series): The pandas Series for which the column type is to be identified.
+
+        Returns:
+        type: Returns `object` if the series is considered categorical, otherwise `float` for continuous.
+        """
+        
+        # Calculate the number of unique values in the series
+        unique_values = len(series.unique())
+        
+        # Calculate the total number of values in the series
+        total_values = len(series)
+        
+        # Define a heuristic threshold
+        unique_ratio = unique_values / total_values
+        
+        # Threshold to consider as continuous vs categorical
+        if unique_ratio < 0.1:
+            return object
+        else:
+            return float
+        
+
+    def do_description(self, name="All", subset="All"):
+        """
+        Generates a descriptive statistics summary for the observations in the AnnData object.
+
+        Args:
+            name (str, optional): Name to be saved with in the adata.uns object. Defaults to "All".
+            subset (tuple, optional): Defaults to "All". 
+                If provided, creates a subset of the observations by a column of the metadata and a value for this column. E.g., (Group, control)
+
+        Returns:
+            None: The resulting DataFrame is stored in the adata.uns attribute of the object.
+        """
+
+        # Access the observation data from the AnnData object
+        df = self.adata.obs
+
+        # If a subset is specified, filter the DataFrame
+        if subset != "All":
+            samples = self.adata.obs[self.adata.obs[subset[0]] == subset[1]].index
+            df = self.adata.obs.loc[samples]
+
+        # Initialize lists to store summary statistics
+        variables, condicion, cuenta, means, medians, normality = [], [], [], [], [], []
+
+        # Iterate over each column in the DataFrame
+        for col in df.columns:
+            if df[col].dtype != object:
+                # Handle numeric columns
+                cuentas = np.nan
+                condicion.append(cuentas)
+
+                cuen = len(df[col]) - df[col].isna().sum()
+                cuenta.append(f"{cuen} ({round(cuen / len(df) * 100, 2)})")
+
+                variables.append(col)
+
+                mean = df[col].mean()
+                desvest = df[col].describe()["std"]
+                means.append(f"{round(mean, 2)} ± {round(desvest, 2)}")
+                medians.append(round(df[col].median(), 2))
+                normality.append(sp.stats.shapiro(df[col].dropna())[1] > 0.05)
+            else:
+                # Handle categorical columns
+                cuentas = df[col].value_counts()
+                for cuent in cuentas.index:
+                    condicion.append(cuent)
+
+                    cuen = cuentas[cuent]
+                    cuenta.append(f"{cuen} ({round(cuen / len(df) * 100, 2)})")
+                    variables.append(col)
+                    means.append(np.nan)
+                    medians.append(np.nan)
+                    normality.append(np.nan)
+
+        # Create a DataFrame from the collected summary statistics
+        df_res = pd.DataFrame(
+            [variables, condicion, cuenta, means, medians, normality],
+            index=["Variable", "Class", "Count (%)", "Mean ± Std_dev", "Median", "Normal Data"]
+        ).T
+
+        # Store the resulting DataFrame in the adata.uns attribute
+        self.adata.uns[f"Description_{name}"] = df_res
 
 
     def filter(self,var_name,subgroup="DROPNAS"):
@@ -91,102 +185,50 @@ class Stastics:
 
             # Regenerate the description with the new data
             self.do_description()
-
-
-
-    def identify_column_type(self,series):
-        unique_values = len(series.unique())
-        total_values = len(series)
         
-        # Definir un umbral heurístico
-        unique_ratio = unique_values / total_values
-    
-        # Umbral para considerar como continuo vs categórico
-        if unique_ratio < 0.1:
-            return object
-        
-        else:
-            return float
         
     def find_var(self, var, adata_df=None):
-        accepted_types = (list, pd.Series, pd.Index, np.ndarray)  # Use tuple for type checking
+        """
+        Finds and returns the specified variable from the AnnData object.
 
-        if type(adata_df)!=pd.DataFrame:
-            adata_df = self.adata.to_df() # Store DataFrame once
+        Parameters:
+        var (str, list, pd.Series, pd.Index, np.ndarray): The variable(s) to be found.
+        adata_df (pd.DataFrame, optional): A DataFrame representation of the AnnData object. If None, it will be created.
+
+        Returns:
+        pd.Series or pd.DataFrame: The found variable(s) from the AnnData object.
+
+        Raises:
+        KeyError: If the specified variable is not found in the AnnData object.
+        AssertionError: If the `var` is not of the accepted types.
+        """
         
+        # Accepted types for the variable
+        accepted_types = (list, pd.Series, pd.Index, np.ndarray)  # Use tuple for type checking
+        
+        # Check if adata_df is not provided or not a DataFrame
+        if type(adata_df) != pd.DataFrame:
+            # Convert AnnData object to DataFrame if not provided
+            adata_df = self.adata.to_df()  # Store DataFrame once
+        
+        # If var is an accepted type (list, pd.Series, pd.Index, np.ndarray)
         if isinstance(var, accepted_types):
-            
+            # Recursively find variables in the list-like structure
             return pd.DataFrame([self.find_var(v, adata_df=adata_df) for v in var]).T
-
+        
+        # Ensure var is a string
         assert isinstance(var, str), f"The value of var must be str or one of {accepted_types}"
-
+        
+        # Check if the variable is in the observation columns
         if var in self.adata.obs.columns:
             return self.adata.obs[var]
         
+        # Check if the variable is in the variable names
         if var in self.adata.var_names:
             return adata_df[var]
         
+        # Raise an error if the variable is not found
         raise KeyError(f"The variable '{var}' can't be found in the anndata object")
-
-    
-    def do_description(self,name="All",subset="All"):
-
-        """_summary_
-
-        Args:
-            name (str, optional): Name to be saved with in the adata.uns object. Defaults to "All".
-            subset (tuple, optional): Defaults to "All". 
-                If provided, creates a subset of the observations by a column fo the metadata and a value for this column.Ej: (Group, control)
-
-        """
-
-        df = self.adata.obs
-
-        if subset!= "All":
-
-            samples = self.adata.obs[self.adata.obs[subset[0]]==subset[1]].index
-
-            df = self.adata.obs.loc[samples]
-
-        
-
-        variables,condicion,cuenta,means,medians,normality = [], [], [], [], [], []
-
-        for col in df.columns:
-
-            if df[col].dtype!=object:
-                cuentas=np.nan
-                condicion.append(cuentas)
-
-                cuen = len(df[col]-df[col].isna().sum())
-
-                cuenta.append(f"{cuen} ({round(cuen/len(df)*100,2)})")
-
-                variables.append(col)
-
-                mean = df[col].mean()
-                desvest = df[col].describe()["std"]
-                means.append(f"{round(mean,2)} ± {round(desvest,2)}")
-                medians.append(round(df[col].median(),2))
-                normality.append(sp.stats.shapiro(df[col].dropna())[1]>0.05)
-
-
-            else:
-
-                cuentas = df[col].value_counts()
-                for cuent in cuentas.index:
-                    condicion.append(cuent)
-
-                    cuen = cuentas[cuent]
-                    cuenta.append(f"{cuen} ({round(cuen/len(df)*100,2)})")
-                    variables.append(col)
-                    means.append(np.nan)
-                    medians.append(np.nan)
-                    normality.append(np.nan)
-
-        df_res= pd.DataFrame([variables,condicion,cuenta,means,medians,normality],index=["Variable","Class","Count (%)","Media ± Desv_est","Mediana","Normal Data"]).T
-
-        self.adata.uns[f"Description_{name}"]= df_res
 
 
     
@@ -198,14 +240,13 @@ class Stastics:
             values (pd.Series): the values to check.
             condition (bool, optional): Whether there is a condition (check the normality of both conditions). Defaults to False.
 
-    
 
         Returns:
             Boolean, true if normal data.
 
         """
 
-        if type(condition)!="NoneType":
+        if type(condition)!="NoneType": # If a condition is provided
 
             # Check the normality of every condition
             return np.all([sp.stats.shapiro(values[condition.index[condition==i]].astype(float))[1]>0.05  for i in condition.unique()])
@@ -243,185 +284,195 @@ class Stastics:
         return np.median(diffs)
 
     
-    def comparisons_1_1(self,target,condition_name:str):
-        """Do the t student or Mann Whitney Comparisons between twoo variables
+    def comparisons_1_1(self, target, condition_name: str):
+        """
+        Performs T-test or Mann-Whitney U test comparisons between two variables.
 
         Args:
-            target (_type_): _description_
-            condition_name (str): _description_
+            target (str): The target variable to compare.
+            condition_name (str): The condition name for grouping the target variable.
 
         Returns:
-            _type_: _description_
+            pd.DataFrame: Updated results report of the comparisons.
         """
-
+        
+        # Convert AnnData object to DataFrame
         df = self.adata.to_df()
 
-        values = df[target].dropna() # Extract the values (dropping missing values)
+        # Extract the values of the target variable, dropping missing values
+        values = df[target].dropna()
 
+        # Extract the corresponding condition values
         condition = self.adata.obs[condition_name][values.index]
 
-        normal= self.__check_normality(values,condition)
+        # Check normality of the values based on the condition
+        normal = self.__check_normality(values, condition)
 
-        # Values splitted in two Series by condition
-
-        sep_values= [values[condition.index[condition==cond]].astype(float) for cond in condition.unique()]
+        # Split the values into two Series based on the unique conditions
+        sep_values = [values[condition.index[condition == cond]].astype(float) for cond in condition.unique()]
 
         if normal:
-
-            test= "T-test"
-
+            test = "T-test"
             mean_dif = sep_values[0].mean() - sep_values[1].mean()
-
             median_dif = np.nan
-
-            pval = sp.stats.ttest_ind(sep_values[0],sep_values[1])[1]
-        
+            pval = sp.stats.ttest_ind(sep_values[0], sep_values[1])[1]
         else:
-
-            test= "Mann-Whitney U"
-
-            pval =  sp.stats.mannwhitneyu(sep_values[0],sep_values[1])[1]
-
+            test = "Mann-Whitney U"
+            pval = sp.stats.mannwhitneyu(sep_values[0], sep_values[1])[1]
             mean_dif = np.nan
-
             median_dif = self.__hodges_lehmann_estimator(sep_values[0], sep_values[1])
-        
-        self.dict_comp_1_1[f"{condition_name}: {target}"]= [normal,test,pval,mean_dif,median_dif]
 
-        results_df = pd.DataFrame(self.dict_comp_1_1).set_index("Comparisson").T
-        
+        # Store the comparison results in a dictionary
+        self.dict_comp_1_1[f"{condition_name}: {target}"] = [normal, test, pval, mean_dif, median_dif]
 
-        if results_df.shape[0]>1:
+        # Create a DataFrame from the comparison results dictionary
+        results_df = pd.DataFrame(self.dict_comp_1_1).set_index("Comparison").T
 
-            # Do the false discover rate control
-            results_df["FDR"] = sp.stats.false_discovery_control(results_df["P-value"].tolist(),method = "bh")
+        if results_df.shape[0] > 1:
+            # Perform false discovery rate control
+            results_df["FDR"] = sp.stats.false_discovery_control(results_df["P-value"].tolist(), method="bh")
+            results_df["Significant"] = results_df["FDR"] < 0.05
 
-            results_df["Significative"] = results_df["FDR"]<0.05
-
+        # Update the instance attribute with the results DataFrame
         self.df_comp_1_1 = results_df
 
         return results_df
 
 
-   # Método para calcular la matriz de correlaciones
-    def __correlations(self,df1,df2,name):
+    def __correlations(self, df1, df2, name):
+        """
+        Calculate the correlation matrix between two dataframes and store the results.
 
-        # Inicializar la matriz de correlaciones
+        Parameters:
+        df1 (pd.DataFrame): First dataframe with the variables of interest.
+        df2 (pd.DataFrame): Second dataframe with the variables of interest.
+        name (str): Name to prefix the stored results in the annotated data (adata) object.
+
+        Returns:
+        None: The function stores the correlation matrix, p-value matrix, and sample size matrix 
+            in the `adata.uns` dictionary with keys based on the provided name.
+        """
+        
+        # Initialize the correlation matrix
         corr_matrix = pd.DataFrame(index=df1.columns, columns=df2.columns)
         pval_matrix = pd.DataFrame(index=df1.columns, columns=df2.columns)
         n_matrix = pd.DataFrame(index=df1.columns, columns=df2.columns)
         
-        # Calcular las correlaciones
+        # Calculate the correlations
         for col1 in df1.columns:
             for col2 in df2.columns:
 
-                # Filtrar los valores no nulos
+                # Filter non-null values
                 valid_idx = df1[col1].notna() & df2[col2].notna()
                 x = df1.loc[valid_idx, col1]
                 y = df2.loc[valid_idx, col2]
 
                 method = "spearman"
 
-                # Check the conditions required to do pearson correlation (continous and normal data)
+                # Check the conditions required to do Pearson correlation (continuous and normal data)
                 if (x.dtype == float) & (y.dtype == float):
-                    if (sp.stats.shapiro(x)[1]>0.05) & (sp.stats.shapiro(y)[1]>0.05): 
+                    if (sp.stats.shapiro(x)[1] > 0.05) & (sp.stats.shapiro(y)[1] > 0.05): 
                         method = "pearson"
 
-                # Do the coresponding corelation
-                if method=="spearman": 
+                # Perform the corresponding correlation
+                if method == "spearman": 
                     corr, pval = sp.stats.spearmanr(x, y)
                 else:
                     corr, pval = sp.stats.pearsonr(x, y)
 
-
+                # Store the results in the matrices
                 corr_matrix.at[col1, col2] = corr
                 pval_matrix.at[col1, col2] = pval
-                n_matrix.at[col1, col2]= len(x)
+                n_matrix.at[col1, col2] = len(x)
 
+        # Store the matrices in the annotated data (adata) object
         self.adata.uns[f"{name}_Corr"] = corr_matrix
         self.adata.uns[f"{name}_Corr_pval"] = pval_matrix
         self.adata.uns[f"{name}_Corr_N"] = n_matrix
 
 
-    
-    def do_correlations(self,variables_A,Variables_B, name):
 
-        # Define the dfs with the selected columns
+    
+    def do_correlations(self, variables_A, Variables_B, name):
+        """
+        Uses the __correlation() method from this class to create the correlation matrix 
+        from the two groups of variables and generates a report from it.
+
+        Args:
+            variables_A (list): List of variables to correlate from the first group.
+            Variables_B (list): List of variables to correlate from the second group.
+            name (str): Name to prefix the stored results and generated report.
+
+        Returns:
+            pd.DataFrame: DataFrame containing the generated correlation report.
+        """
+
+        # Define the dataframes with the selected columns
         df1 = self.find_var(variables_A)
         df2 = self.find_var(Variables_B)
         
-        self.__correlations(df1,df2,name=name)
+        # Create the correlation matrix
+        self.__correlations(df1, df2, name=name)
+        
+        # Generate the report from the correlation matrix
         results_df = self.generate_corr_report(name=name)
 
         return results_df
 
 
 
+
     def order_comparisons(self,index):
         """
         Args:
-            index (pd.Index): index of the results DataFrame
+            index (pd.Index): index of the results DataFrame.
 
         Returns:
-            Values of the index strings oredered
+            Values of the index strings oredered.
         """
         parts = index.split(" vs ")
         parts.sort()
+
         return " vs ".join(parts)
 
 
-    def generate_corr_report(self,name,select_vars = None):
-
+    def generate_corr_report(self, name, select_vars=None):
         """
-        Description: This method generates a report from a correlation analysis previously run.
+        Generates a report from a correlation analysis previously run.
 
         Parameters:
-            name: (str) The name of the tcorrelation analysis.
-
+            name (str): The name of the correlation analysis.
+            select_vars (list, optional): List of selected variables to include in the report.
 
         Returns:
-            report: (pd.DataFrame)
+            pd.DataFrame: DataFrame containing the correlation report.
         """
-
-
-        matrix_dict = self.adata.uns
         
+        matrix_dict = self.adata.uns
 
+        var1, var2, corr, pval, num = [], [], [], [], []
 
-        var1,var2,corr,pval,num = [], [], [], [], []
+        df_bool = matrix_dict[f"{name}_Corr"] < 0.999  # DataFrame indicating the self-correlation variables
 
-        df_bool = matrix_dict[f"{name}_Corr"]<0.999  # A dataframe that indicates the self correlation variables
-
-        if select_vars!=None:
-
-            
-
+        if select_vars is not None:           
             select_vars = set(select_vars)
-
-            assert len(select_vars.intersection(set(df_bool.columns.tolist()+df_bool.index.tolist()))) == len(select_vars), "One or more variables not found in the correlation matrix"
-
+            assert len(select_vars.intersection(set(df_bool.columns.tolist() + df_bool.index.tolist()))) == len(select_vars), "One or more variables not found in the correlation matrix"
+            
             cols = list(select_vars.intersection(df_bool.columns))
-
-            if len(cols)>0:
-                df_bool=df_bool[cols]
+            if len(cols) > 0:
+                df_bool = df_bool[cols]
             
             rows = list(select_vars.intersection(df_bool.index))
-
-            if len(rows)>0:
-                df_bool=df_bool.loc[rows]
-
-
+            if len(rows) > 0:
+                df_bool = df_bool.loc[rows]
 
         for col in df_bool.columns:
-
             for term in df_bool.index[df_bool[col]].tolist():
-
                 var1.append(col)
                 var2.append(term)
-                corr.append(matrix_dict[f"{name}_Corr"].loc[term,col])
-                pval.append(matrix_dict[f"{name}_Corr_pval"].loc[term,col])
-                num.append(matrix_dict[f"{name}_Corr_N"].loc[term,col])
-
+                corr.append(matrix_dict[f"{name}_Corr"].loc[term, col])
+                pval.append(matrix_dict[f"{name}_Corr_pval"].loc[term, col])
+                num.append(matrix_dict[f"{name}_Corr_N"].loc[term, col])
 
         # Convert the lists to a DataFrame for better visualization
         results_df = pd.DataFrame({
@@ -432,9 +483,8 @@ class Stastics:
             'N': num
         })
 
-        results_df["Correlated Variables"]= results_df.Variable_1+" vs "+results_df.Variable_2
-
-        results_df=results_df.dropna().set_index("Correlated Variables")
+        results_df["Correlated Variables"] = results_df.Variable_1 + " vs " + results_df.Variable_2
+        results_df = results_df.dropna().set_index("Correlated Variables")
 
         # Apply the function to the indexes
         results_df.index = results_df.index.map(self.order_comparisons)
@@ -442,153 +492,164 @@ class Stastics:
         # Eliminate duplicated indexes
         results_df = results_df[~results_df.index.duplicated(keep='first')]
 
-        # Do the false discover rate control
-        results_df["FDR"] = sp.stats.false_discovery_control(results_df["P-value"],method = "bh")
+        # Perform false discovery rate control
+        results_df["FDR"] = sp.stats.false_discovery_control(results_df["P-value"], method="bh")
+        results_df["Significative"] = results_df["FDR"] < 0.05
 
-        results_df["Significative"] = results_df["FDR"]<0.05
-
-        # In case we selected 
-        if select_vars!=None:
-             
-            prefix = 1+ max([int(i.split("_")[0]) if i.split("_")[0].isdigit() else 0 for i in self.adata.uns.keys()])
-            
+        # If select_vars is specified, handle the selection logic
+        if select_vars is not None:
+            prefix = 1 + max([int(i.split("_")[0]) if i.split("_")[0].isdigit() else 0 for i in self.adata.uns.keys()])
             name = f"{prefix}_Selection"
 
-            # If the report hasnt been generated yet
-        
-            if np.all(np.array([self.adata.uns[result].index.tolist() !=results_df.index.tolist() for result in self.adata.uns.keys()])):
-
+            # If the report has not been generated yet
+            if np.all(np.array([self.adata.uns[result].index.tolist() != results_df.index.tolist() for result in self.adata.uns.keys()])):
                 self.adata.uns[f"{name}_Corr_report"] = results_df
-                
         else:
-            self.adata.uns[f"{name}_Corr_report"] = results_df          
-
-        
+            self.adata.uns[f"{name}_Corr_report"] = results_df
 
         return results_df
     
-    
-    def chi_sq(self, col:str, expected_proportions = [0.5, 0.5]):
 
+    def chi_sq(self, col: str, expected_proportions=[0.5, 0.5]):
         """
-        Perform a chi-squared test with the values of a metadata column
+        Perform a chi-squared test with the values of a metadata column.
 
-        
+        Parameters:
+            col (str): The name of the metadata column to perform the chi-squared test on.
+            expected_proportions (list, optional): The expected proportions for each category. Default is [0.5, 0.5].
+
+        Returns:
+            p_value (float): Value P of the chi-squared test.
+            None: The results of the chi-squared test are stored in the `adata.uns` dictionary and printed.
         """
-        observed_counts = [i for i in self.adata.obs[col].value_counts()] # Extract the  number of observed counts
+        # Extract the number of observed counts
+        observed_counts = [i for i in self.adata.obs[col].value_counts()] 
         total_count = sum(observed_counts) 
-        expected_counts = [total_count * p for p in expected_proportions] # Calculate the expected counts
+        # Calculate the expected counts
+        expected_counts = [total_count * p for p in expected_proportions] 
 
-        # Realizar la prueba de chi-cuadrado
+        # Perform the chi-squared test
         chi2, p_value = sp.stats.chisquare(f_obs=observed_counts, f_exp=expected_counts)
 
-        self.adata.uns[f"CHI_SQ_{col}"] = {"P-val":p_value,"Stastic":chi2}
+        # Store the test results in the annotated data (adata) object
+        self.adata.uns[f"CHI_SQ_{col}"] = {"P-val": p_value, "Statistic": chi2}
 
+        # Print the results of the test
         if p_value < 0.05:
-            print(f"La proporción de cuentas de las variables de la columna {col} se desvía significativamente del lo esperado.")
+            print(f"The proportion of counts for the variables in column {col} deviates significantly from the expected.")
         else:
-            print(f"La proporción de cuentas de las variables de la columna {col} no se desvía significativamente del lo esperado.")
+            print(f"The proportion of counts for the variables in column {col} does not deviate significantly from the expected.")
+
+        return p_value
 
 
 
-    def plot_differences(self, condition ,varsname = " ",vars = "All", kind = "Violin",save=False,ylab = "",show=False):
-        """Method to do violin or boxplots comparing different states of the data
+
+    def plot_differences(self, condition, vars="All", kind="Violin", ylab="", xlab=" ", save=False, show=False):
+        """
+        Method to create violin or boxplots comparing different states of the data.
 
         Args:
             condition (str): The condition to compare the variables by.
-            varsname (str, optional): The name of the variables, appars in the x label. Defaults to " ".
-            vars (str, optional): Name of the variables to compare (list, np.array or pd.Series). Defaults to "All".
-            kind (str, optional): Box for boxplot. Defaults to "Violin".
-            save (bool, optional): path to save the figure. Defaults to False.
-            ylab (str, optional): label of the y axe. Defaults to "".
-            show (bool, optional): whether to show the plot or close it directly.
+            vars (str, optional): Name of the variables to compare (list, np.array, or pd.Series). Defaults to "All".
+            kind (str, optional): "Box" for boxplot, "Violin" for violin plot. Defaults to "Violin".
+            ylab (str, optional): Label of the y-axis. Defaults to "".
+            xlab (str, optional): The name of the variables, appears in the x label. Defaults to " ".
+            save (bool, optional): Path to save the figure. Defaults to False.
+            show (bool, optional): Whether to show the plot or close it directly. Defaults to False.
 
         Raises:
-            AttributeError: If someone requests an other kind of plot
+            AttributeError: If an unsupported kind of plot is requested.
         """
 
-        
-        if isinstance(vars, str) and vars == "All": # In case of defoult all variables are selected
+        if isinstance(vars, str) and vars == "All":  # If default, all variables are selected
             vars = self.adata.var_names
             df_var = self.adata.to_df()[vars]
         
-        elif isinstance(vars, str): # In case a single variable is selected
+        elif isinstance(vars, str):  # If a single variable is selected
             df_var = self.adata.to_df()[vars].to_frame()
 
-        else: # The user selects some of the variables
+        else:  # User selects some of the variables
             df_var = self.adata.to_df()[vars]
             
-        df_var[condition] = df_var.index.map(dict(zip(self.adata.obs.index,self.adata.obs[condition])))
-        df_var = df_var.melt(id_vars=condition,value_name="value",var_name=varsname)
+        df_var[condition] = df_var.index.map(dict(zip(self.adata.obs.index, self.adata.obs[condition])))
 
-        
-        # Crear el plot
+
+        df_var = df_var.melt(id_vars=condition, value_name="value", var_name=xlab.upper())
+
+        # Create the plot
         plt.figure(figsize=(10, 6))
 
-        if kind=="Violin":
-            sns.violinplot(x=varsname, y= "value", data=df_var, inner='quart', hue=condition, split=False)
+        if kind == "Violin":
+            sns.violinplot(x=xlab, y="value", data=df_var, inner='quart', hue=condition, split=False)
 
-        elif kind=="Box":
-            sns.boxplot(x=varsname, y= "value", data=df_var,  hue=condition,fliersize=0)
-            # Mejorar la estética
-            plt.grid(True, which='both', linestyle='--', linewidth=0.5)  # Añadir una cuadrícula sutil
+        elif kind == "Box":
+            sns.boxplot(x=xlab, y="value", data=df_var, hue=condition, fliersize=0)
+            # Enhance aesthetics
+            plt.grid(True, which='both', linestyle='--', linewidth=0.5)  # Add a subtle grid
         
         else:
-            print("Option not implemetnted yet")
+            print("Option not implemented yet")
             raise AttributeError
         
-        sns.stripplot(x=varsname, y="value", data=df_var, hue=condition, dodge=True, jitter=True, color='k', alpha=0.5,legend=False)
+        sns.stripplot(x=xlab, y="value", data=df_var, hue=condition, dodge=True, jitter=True, color='k', alpha=0.5, legend=False)
 
-
-        # Añadir títulos y etiquetas
-        plt.xlabel(varsname)
+        # Add labels
+        plt.xlabel(xlab)
         plt.ylabel(ylab)
         plt.xticks(rotation=25, ha='right')
 
-        # Si solo hay una variable no mostrar los ticks
-        if len(df_var[varsname].unique())==1:
+        # If only one variable, do not show the ticks
+        if len(df_var[xlab].unique()) == 1:
             plt.xticks([])
 
+        # Place the legend
+        plt.legend(title=condition, loc='best')
 
-        # Colocar la leyenda
-        plt.legend(title=condition,loc='best')
-
-        
         sns.despine()
 
         if save:
-            plt.savefig(save,bbox_inches="tight")
+            plt.savefig(save, bbox_inches="tight")
 
         if show:
             plt.show()
-
         else:
-            plt.close()  
+            plt.close()
 
 
-    def plot_correlation(self, var1 ,var2, save=False,show=False):
-        
-        variable1 = self.find_var(var1)
-        variable2 = self.find_var(var2)
+    def plot_correlation(self, var1, var2, save=False, show=False):
+        """
+        Plot the correlation between two variables using a scatter plot.
 
-        df_plot = pd.DataFrame([variable1,variable2]).T
+        Args:
+            var1 (str): The name of the first variable.
+            var2 (str): The name of the second variable.
+            save (bool or str, optional): Path to save the figure. Defaults to False.
+            show (bool, optional): Whether to show the plot or close it directly. Defaults to False.
 
-        # Crear el plot
+        Returns:
+            None
+        """
+
+        df_plot = self.find_var([var1, var2]).dropna()
+
+        # Create the plot
         plt.figure(figsize=(10, 6))
         
         sns.scatterplot(x=var1, y=var2, data=df_plot)
-
-        plt.grid(True, which='both', linestyle='--', linewidth=0.5)  # Añadir una cuadrícula sutil
-
+        
+        # Add a subtle grid
+        plt.grid(True, which='both', linestyle='--', linewidth=0.5)
 
         sns.despine()
 
+        plt.title(f"Correlation: {var2} vs {var1} (n={df_plot.shape[0]})")
+
         if save:
-            plt.savefig(save,bbox_inches="tight")
+            plt.savefig(save, bbox_inches="tight")
 
         if show:
             plt.show()
-
         else:
-            plt.close()       
+            plt.close()
 
