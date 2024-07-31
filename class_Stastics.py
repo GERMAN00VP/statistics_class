@@ -26,6 +26,7 @@ class Stastics:
 
         self.df_comp_1_1 = pd.DataFrame(self.dict_comp_1_1).T
 
+
     def filter(self,var_name,subgroup="DROPNAS"):
 
         """Method that can filter the adata object by a variable of data or metadata
@@ -107,23 +108,25 @@ class Stastics:
         else:
             return float
         
-    def find_var(self,var):
+    def find_var(self, var, adata_df=None):
+        accepted_types = (list, pd.Series, pd.Index, np.ndarray)  # Use tuple for type checking
+
+        if type(adata_df)!=pd.DataFrame:
+            adata_df = self.adata.to_df() # Store DataFrame once
+        
+        if isinstance(var, accepted_types):
+            
+            return pd.DataFrame([self.find_var(v, adata_df=adata_df) for v in var]).T
+
+        assert isinstance(var, str), f"The value of var must be str or one of {accepted_types}"
 
         if var in self.adata.obs.columns:
-            
-            variable = self.adata.obs[var]
-
-
-        elif var in self.adata.var_names:
-
-            variable = self.adata.to_df()[var]
-
-        else:
-            print(f"The variable '{var} can`t be found in the anndata object" )
-            raise KeyError
+            return self.adata.obs[var]
         
-        return variable
-
+        if var in self.adata.var_names:
+            return adata_df[var]
+        
+        raise KeyError(f"The variable '{var}' can't be found in the anndata object")
 
     
     def do_description(self,name="All",subset="All"):
@@ -147,7 +150,7 @@ class Stastics:
 
         
 
-        variables,condicion,cuenta,means,medians = [], [], [], [], []
+        variables,condicion,cuenta,means,medians,normality = [], [], [], [], [], []
 
         for col in df.columns:
 
@@ -165,6 +168,7 @@ class Stastics:
                 desvest = df[col].describe()["std"]
                 means.append(f"{round(mean,2)} ± {round(desvest,2)}")
                 medians.append(round(df[col].median(),2))
+                normality.append(sp.stats.shapiro(df[col].dropna())[1]>0.05)
 
 
             else:
@@ -174,13 +178,13 @@ class Stastics:
                     condicion.append(cuent)
 
                     cuen = cuentas[cuent]
-
                     cuenta.append(f"{cuen} ({round(cuen/len(df)*100,2)})")
                     variables.append(col)
                     means.append(np.nan)
                     medians.append(np.nan)
+                    normality.append(np.nan)
 
-        df_res= pd.DataFrame([variables,condicion,cuenta,means,medians],index=["Variable","Class","Count (%)","Media ± Desv_est","Mediana"]).T
+        df_res= pd.DataFrame([variables,condicion,cuenta,means,medians,normality],index=["Variable","Class","Count (%)","Media ± Desv_est","Mediana","Normal Data"]).T
 
         self.adata.uns[f"Description_{name}"]= df_res
 
@@ -284,13 +288,23 @@ class Stastics:
         
         self.dict_comp_1_1[f"{condition_name}: {target}"]= [normal,test,pval,mean_dif,median_dif]
 
-        self.df_comp_1_1= pd.DataFrame(self.dict_comp_1_1).set_index("Comparisson").T
+        results_df = pd.DataFrame(self.dict_comp_1_1).set_index("Comparisson").T
+        
 
-        return self.df_comp_1_1
+        if results_df.shape[0]>1:
+
+            # Do the false discover rate control
+            results_df["FDR"] = sp.stats.false_discovery_control(results_df["P-value"].tolist(),method = "bh")
+
+            results_df["Significative"] = results_df["FDR"]<0.05
+
+        self.df_comp_1_1 = results_df
+
+        return results_df
 
 
-    # Método para calcular la matriz de correlaciones
-    def __correlations(self,df1,df2,name,method='spearman',save_in="varm"):
+   # Método para calcular la matriz de correlaciones
+    def __correlations(self,df1,df2,name):
 
         # Inicializar la matriz de correlaciones
         corr_matrix = pd.DataFrame(index=df1.columns, columns=df2.columns)
@@ -301,60 +315,47 @@ class Stastics:
         for col1 in df1.columns:
             for col2 in df2.columns:
 
-                # Extract the common non missing value indexes
-                intersection_indexes = list(set(df1[col1].dropna().index).intersection(set(df2[col2].dropna().index)))
+                # Filtrar los valores no nulos
+                valid_idx = df1[col1].notna() & df2[col2].notna()
+                x = df1.loc[valid_idx, col1]
+                y = df2.loc[valid_idx, col2]
 
-                # Run the correlation
-                if method == 'spearman':
-                    corr, pval = sp.stats.spearmanr(df1[col1].loc[intersection_indexes], df2[col2].loc[intersection_indexes])
-                elif method == 'pearson':
-                    corr, pval = sp.stats.pearsonr(df1[col1].loc[intersection_indexes], df2[col2].loc[intersection_indexes])
+                method = "spearman"
+
+                # Check the conditions required to do pearson correlation (continous and normal data)
+                if (x.dtype == float) & (y.dtype == float):
+                    if (sp.stats.shapiro(x)[1]>0.05) & (sp.stats.shapiro(y)[1]>0.05): 
+                        method = "pearson"
+
+                # Do the coresponding corelation
+                if method=="spearman": 
+                    corr, pval = sp.stats.spearmanr(x, y)
                 else:
-                    raise ValueError("Method not supported. Use 'spearman' or 'pearson'.")
-                
+                    corr, pval = sp.stats.pearsonr(x, y)
 
-                corr_matrix.loc[col1, col2] = corr
-                pval_matrix.loc[col1, col2] = pval
-                n_matrix.loc[col1, col2]= len(intersection_indexes)
 
-        if save_in=="varm":
+                corr_matrix.at[col1, col2] = corr
+                pval_matrix.at[col1, col2] = pval
+                n_matrix.at[col1, col2]= len(x)
+
+        self.adata.uns[f"{name}_Corr"] = corr_matrix
+        self.adata.uns[f"{name}_Corr_pval"] = pval_matrix
+        self.adata.uns[f"{name}_Corr_N"] = n_matrix
+
+
+    
+    def do_correlations(self,variables_A,Variables_B, name):
+
+        # Define the dfs with the selected columns
+        df1 = self.find_var(variables_A)
+        df2 = self.find_var(Variables_B)
         
-            self.adata.varm[f"{name}_Corr"] = corr_matrix
-            self.adata.varm[f"{name}_Corr_pval"] = pval_matrix
-            self.adata.varm[f"{name}_Corr_N"] = n_matrix
+        self.__correlations(df1,df2,name=name)
+        results_df = self.generate_corr_report(name=name)
 
-        elif save_in=="uns":
-            self.adata.uns[f"{name}_Corr"] = corr_matrix
-            self.adata.uns[f"{name}_Corr_pval"] = pval_matrix
-            self.adata.uns[f"{name}_Corr_N"] = n_matrix
-
-        else:
-            print("This is not a suitable place for storing the data")
-    
-
-    
-    def correlations_metadata(self,save_in="uns"):
-
-        df1 = self.adata.obs
-        df2 = self.adata.obs
-
-        self.__correlations(df1,df2,name="Metadata_Metadata",save_in=save_in)
-
-    
-    def correlations_metadata_variables(self):
-
-        df1 = self.adata.to_df()
-        df2 = self.adata.obs
-
-        self.__correlations(df1,df2,name="Variables_Metadata")
+        return results_df
 
 
-    def correlations_variables(self):
-
-        df1 = self.adata.to_df()
-        df2 = self.adata.to_df()
-
-        self.__correlations(df1,df2,name="Variables_Variables")
 
     def order_comparisons(self,index):
         """
@@ -369,7 +370,7 @@ class Stastics:
         return " vs ".join(parts)
 
 
-    def generate_corr_report(self,name="Variables_Metadata",save_in="varm",select_vars = None):
+    def generate_corr_report(self,name,select_vars = None):
 
         """
         Description: This method generates a report from a correlation analysis previously run.
@@ -382,12 +383,8 @@ class Stastics:
             report: (pd.DataFrame)
         """
 
-        if save_in=="varm":
 
-            matrix_dict = self.adata.varm
-
-        else: 
-            matrix_dict = self.adata.uns
+        matrix_dict = self.adata.uns
         
 
 
