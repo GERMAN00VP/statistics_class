@@ -25,7 +25,7 @@ class Stastics:
         self.do_description()
 
 
-        self.dict_comp_1_1 = {"Comparison":["Normal_Data","Test","P-value","Mean_Difference","Hodges_Lehmann_Estimator"]}
+        self.dict_comp_1_1 = {"Comparison":["Normal_Data","Test","P-value","Mean_Difference","Hodges_Lehmann_Estimator","N"]}
 
         self.df_comp_1_1 = pd.DataFrame(self.dict_comp_1_1).T
 
@@ -296,11 +296,11 @@ class Stastics:
             pd.DataFrame: Updated results report of the comparisons.
         """
         
-        # Convert AnnData object to DataFrame
-        df = self.adata.to_df()
-
+        
         # Extract the values of the target variable, dropping missing values
-        values = df[target].dropna()
+        values = self.find_var(var=target).dropna()
+
+        assert values.dtype!= object, "Target must be a continious variable"
 
         # Extract the corresponding condition values
         condition = self.adata.obs[condition_name][values.index]
@@ -310,6 +310,7 @@ class Stastics:
 
         # Split the values into two Series based on the unique conditions
         sep_values = [values[condition.index[condition == cond]].astype(float) for cond in condition.unique()]
+
 
         if normal:
             test = "T-test"
@@ -323,7 +324,7 @@ class Stastics:
             median_dif = self.__hodges_lehmann_estimator(sep_values[0], sep_values[1])
 
         # Store the comparison results in a dictionary
-        self.dict_comp_1_1[f"{condition_name}: {target}"] = [normal, test, pval, mean_dif, median_dif]
+        self.dict_comp_1_1[f"{condition_name}: {target}"] = [normal, test, pval, mean_dif, median_dif, len(values)]
 
         # Create a DataFrame from the comparison results dictionary
         results_df = pd.DataFrame(self.dict_comp_1_1).set_index("Comparison").T
@@ -564,13 +565,13 @@ class Stastics:
 
         if isinstance(vars, str) and vars == "All":  # If default, all variables are selected
             vars = self.adata.var_names
-            df_var = self.adata.to_df()[vars]
+            df_var = self.find_var(var=vars)
         
         elif isinstance(vars, str):  # If a single variable is selected
-            df_var = self.adata.to_df()[vars].to_frame()
+            df_var = self.find_var(var=vars).to_frame()
 
         else:  # User selects some of the variables
-            df_var = self.adata.to_df()[vars]
+            df_var = self.find_var(var=vars)
             
         df_var[condition] = df_var.index.map(dict(zip(self.adata.obs.index, self.adata.obs[condition])))
 
