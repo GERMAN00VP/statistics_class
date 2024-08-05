@@ -593,7 +593,7 @@ class Stastics:
             print("Option not implemented yet")
             raise AttributeError
         
-        sns.stripplot(x=xlab, y="value", data=df_var, hue=condition, dodge=True, jitter=True, color='k', alpha=0.5, legend=False)
+        ax = sns.stripplot(x=xlab, y="value", data=df_var, hue=condition, dodge=True, jitter=True, palette='dark:k', alpha=0.5, legend=False)
 
         # Add labels
         plt.xlabel(xlab)
@@ -608,6 +608,14 @@ class Stastics:
         plt.legend(title=condition, loc='best')
 
         sns.despine()
+
+        
+        # Extraer los tick labels actuales del eje x y generar unos nuevos con el valor de la n
+        x_tick_labels = [f"{item.get_text().capitalize()} (n={df_var.dropna()[" "].value_counts()[item.get_text()]}) " for item in ax.get_xticklabels()]
+
+        # Aplicar los nuevos tick labels al eje x
+        ax.set_xticklabels(x_tick_labels)
+
 
         if save:
             plt.savefig(save, bbox_inches="tight")
