@@ -3,16 +3,24 @@ import anndata as ad
 import numpy as np
 import scipy as sp
 import matplotlib.pyplot as plt
+import re
 import seaborn as sns
 
 
 
 class Stastics:
 
+    def __init__(self, data=None, metadata=None,adata=None):
 
-    def __init__(self, data, metadata):
+        assert type(adata)!=type(None) or type(data)!=type(None) , "You have to provide some data and metadata (or AnnData) in order to create the object"
 
-        self.adata = ad.AnnData(data,obs=metadata)
+        if type(adata)==type(None):
+
+            self.adata = ad.AnnData(data,obs=metadata)
+        
+        else:
+
+            self.adata = adata
 
         # Removal of the duplicated columns
         self.adata.obs = self.adata.obs.T.drop_duplicates().T
@@ -54,6 +62,10 @@ class Stastics:
         if unique_ratio < 0.1:
             return object
         else:
+            # If any of the non missing values is a string returns an object as well
+            if np.any(np.array([re.match(pattern="^-?\d+(\.\d+)?$",string=str(i))==None for i in series.dropna().unique()])):
+                return object
+            
             return float
         
 
@@ -79,31 +91,32 @@ class Stastics:
             df = self.adata.obs.loc[samples]
 
         # Initialize lists to store summary statistics
-        variables, condicion, cuenta, means, medians, normality = [], [], [], [], [], []
+        variables, condicion, cuenta, means, medians, normality,iqr = [], [], [], [], [], [], []
 
         # Iterate over each column in the DataFrame
         for col in df.columns:
             if df[col].dtype != object:
                 # Handle numeric columns
+
                 cuentas = np.nan
                 condicion.append(cuentas)
-
-                cuen = len(df[col]) - df[col].isna().sum()
+                cuen = len(df[col].dropna()) 
+                iqr.append(f"{df[col].quantile(0.25)} - {round(df[col].quantile(0.75),2)}")
                 cuenta.append(f"{cuen} ({round(cuen / len(df) * 100, 2)})")
-
                 variables.append(col)
-
                 mean = df[col].mean()
                 desvest = df[col].describe()["std"]
                 means.append(f"{round(mean, 2)} ± {round(desvest, 2)}")
                 medians.append(round(df[col].median(), 2))
                 normality.append(sp.stats.shapiro(df[col].dropna())[1] > 0.05)
+
             else:
                 # Handle categorical columns
+        
                 cuentas = df[col].value_counts()
                 for cuent in cuentas.index:
                     condicion.append(cuent)
-
+                    iqr.append(np.nan)
                     cuen = cuentas[cuent]
                     cuenta.append(f"{cuen} ({round(cuen / len(df) * 100, 2)})")
                     variables.append(col)
@@ -113,15 +126,15 @@ class Stastics:
 
         # Create a DataFrame from the collected summary statistics
         df_res = pd.DataFrame(
-            [variables, condicion, cuenta, means, medians, normality],
-            index=["Variable", "Class", "Count (%)", "Mean ± Std_dev", "Median", "Normal Data"]
+            [variables, condicion, cuenta, means, medians, normality,iqr],
+            index=["Variable", "Class", "Count (%)", "Mean ± Std_dev", "Median", "Normal Data","IQR"]
         ).T
 
         # Store the resulting DataFrame in the adata.uns attribute
         self.adata.uns[f"Description_{name}"] = df_res
 
 
-    def filter(self,var_name,subgroup="DROPNAS"):
+    def filter(self,var_name,subgroup="DROPNAS",in_place=True):
 
         """Method that can filter the adata object by a variable of data or metadata
 
@@ -179,12 +192,18 @@ class Stastics:
 
             print("Any of the observations meet the desired filtering conditions.\nThe filtering won`t be performed.")
 
-        else:        
-            # Do the filtering
-            self.adata = self.adata[indexes,:]
+        else:
 
-            # Regenerate the description with the new data
-            self.do_description()
+            if in_place:        
+                # Do the filtering
+                self.adata = self.adata[indexes,:]
+
+                # Regenerate the description with the new data
+                self.do_description()
+
+            else:
+                # Return a filtered object
+                return Stastics(adata = self.adata[indexes,:])
         
         
     def find_var(self, var, adata_df=None):
