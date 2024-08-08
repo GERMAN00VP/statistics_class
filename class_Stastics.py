@@ -33,10 +33,14 @@ class Stastics:
         self.do_description()
 
 
+        # Initialize a dictionary and a datafame to store continous parways comparisons
         self.dict_comp_1_1 = {"Comparison":["Normal_Data","Test","P-value","Mean_Difference","Hodges_Lehmann_Estimator","N"]}
 
         self.df_comp_1_1 = pd.DataFrame(self.dict_comp_1_1).T
 
+        # Initialize a dictionary and a datafame to store categorical parways comparisons
+        self.dict_chi_sq = {"Name":["Chi2_statistic","P-value","N"]}
+        self.adata.uns["CHI_SQ_TABLE"] = pd.DataFrame(self.dict_chi_sq).T
 
     def __identify_column_type(self, series):
         """
@@ -101,7 +105,7 @@ class Stastics:
                 cuentas = np.nan
                 condicion.append(cuentas)
                 cuen = len(df[col].dropna()) 
-                iqr.append(f"{df[col].quantile(0.25)} - {round(df[col].quantile(0.75),2)}")
+                iqr.append(f"{round(df[col].quantile(0.25),2)} - {round(df[col].quantile(0.75),2)}")
                 cuenta.append(f"{cuen} ({round(cuen / len(df) * 100, 2)})")
                 variables.append(col)
                 mean = df[col].mean()
@@ -317,12 +321,18 @@ class Stastics:
         
         
         # Extract the values of the target variable, dropping missing values
-        values = self.find_var(var=target).dropna()
+        df_test = self.find_var(var=[target,condition_name]).dropna()
+        df_test = df_test.astype(df_test.apply(self.__identify_column_type))
+
+        values = df_test[target]
 
         assert values.dtype!= object, "Target must be a continious variable"
 
         # Extract the corresponding condition values
-        condition = self.adata.obs[condition_name][values.index]
+        condition = df_test[condition_name]
+
+        assert len(condition.unique())==2, "There must be two levels to compare"
+
 
         # Check normality of the values based on the condition
         normal = self.__check_normality(values, condition)
@@ -413,13 +423,13 @@ class Stastics:
 
 
     
-    def do_correlations(self, variables_A, Variables_B, name):
+    def do_correlations(self, Variables_A, Variables_B, name):
         """
         Uses the __correlation() method from this class to create the correlation matrix 
         from the two groups of variables and generates a report from it.
 
         Args:
-            variables_A (list): List of variables to correlate from the first group.
+            Variables_A (list): List of variables to correlate from the first group.
             Variables_B (list): List of variables to correlate from the second group.
             name (str): Name to prefix the stored results and generated report.
 
@@ -428,8 +438,13 @@ class Stastics:
         """
 
         # Define the dataframes with the selected columns
-        df1 = self.find_var(variables_A)
+        df1 = self.find_var(Variables_A)
+        if len(df1.shape)==1:
+            df1=df1.to_frame()
+
         df2 = self.find_var(Variables_B)
+        if len(df2.shape)==1:
+            df2=df2.to_frame()
         
         # Create the correlation matrix
         self.__correlations(df1, df2, name=name)
@@ -535,37 +550,57 @@ class Stastics:
         Perform a chi-squared test with the values of a metadata column.
 
         Parameters:
-            col (str): The name of the metadata column to perform the chi-squared test on.
+            col (str): The name of the metadata column to perform the chi-squared test on, or list of var names to compare, 
+            the first is the reference.
             expected_proportions (list, optional): The expected proportions for each category. Default is [0.5, 0.5].
 
         Returns:
             p_value (float): Value P of the chi-squared test.
             None: The results of the chi-squared test are stored in the `adata.uns` dictionary and printed.
+
         """
-        # Extract the number of observed counts
-        observed_counts = [i for i in self.adata.obs[col].value_counts()] 
-        total_count = sum(observed_counts) 
-        # Calculate the expected counts
-        expected_counts = [total_count * p for p in expected_proportions] 
 
-        # Perform the chi-squared test
-        chi2, p_value = sp.stats.chisquare(f_obs=observed_counts, f_exp=expected_counts)
+        # If two variables are going to be compared
+        if type(col)!=str:
 
-        # Store the test results in the annotated data (adata) object
-        self.adata.uns[f"CHI_SQ_{col}"] = {"P-val": p_value, "Statistic": chi2}
+            name = "-".join(col)
 
-        # Print the results of the test
-        if p_value < 0.05:
-            print(f"The proportion of counts for the variables in column {col} deviates significantly from the expected.")
-        else:
-            print(f"The proportion of counts for the variables in column {col} does not deviate significantly from the expected.")
+            chi_df = self.find_var(col).dropna()
+            df_contingency = pd.crosstab(chi_df[col[0]],chi_df[col[1]])
+            chi2, p_value, dof, expected  = sp.stats.chi2_contingency(df_contingency)
+            N = chi_df.shape[0]
 
-        return p_value
+        else: 
+            name = col
+            # Extract the number of observed counts
+            data = self.find_var(col).dropna()
+            observed_counts = [i for i in data.value_counts()] 
+            total_count = sum(observed_counts) 
+            # Calculate the expected counts
+            expected_counts = [total_count * p for p in expected_proportions] 
+
+            # Perform the chi-squared test
+            chi2, p_value = sp.stats.chisquare(f_obs=observed_counts, f_exp=expected_counts)
+
+            N = len(data)
+
+
+        # Store the comparison results in a dictionary
+        self.dict_chi_sq[name] =[chi2, p_value, N]
+
+        # Create a DataFrame from the comparison results dictionary
+        results_df = pd.DataFrame(self.dict_chi_sq).set_index("Name").T
+        
+        # Save the data in adata.uns
+        self.adata.uns["CHI_SQ_TABLE"] = results_df 
+
+        return results_df
 
 
 
 
-    def plot_differences(self, condition, vars="All", kind="Violin", ylab="", xlab=" ", save=False, show=False):
+
+    def plot_differences(self, condition, vars="All", kind="Violin", ylab="", xlab=" ", ylog=False, save=False, show=False):
         """
         Method to create violin or boxplots comparing different states of the data.
 
@@ -613,6 +648,10 @@ class Stastics:
             raise AttributeError
         
         ax = sns.stripplot(x=xlab, y="value", data=df_var, hue=condition, dodge=True, jitter=True, palette='dark:k', alpha=0.5, legend=False)
+
+
+        if ylog:
+            plt.yscale("log")
 
         # Add labels
         plt.xlabel(xlab)
