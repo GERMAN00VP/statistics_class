@@ -3,8 +3,10 @@ import anndata as ad
 import numpy as np
 import scipy as sp
 import matplotlib.pyplot as plt
+import matplotlib
 import re
 import seaborn as sns
+import statsmodels.api as sm
 
 
 
@@ -41,6 +43,9 @@ class Stastics:
         # Initialize a dictionary and a datafame to store categorical parways comparisons
         self.dict_chi_sq = {"Name":["Chi2_statistic","P-value","N"]}
         self.adata.uns["CHI_SQ_TABLE"] = pd.DataFrame(self.dict_chi_sq).T
+
+        # Initialize a dictionary for anova results
+        self.dict_anova= {"Name":["F","P-value"]}
 
     def __identify_column_type(self, series):
         """
@@ -237,7 +242,9 @@ class Stastics:
         # If var is an accepted type (list, pd.Series, pd.Index, np.ndarray)
         if isinstance(var, accepted_types):
             # Recursively find variables in the list-like structure
-            return pd.DataFrame([self.find_var(v, adata_df=adata_df) for v in var]).T
+            finded_vars = pd.DataFrame([self.find_var(v, adata_df=adata_df) for v in var]).T
+
+            return finded_vars.astype(finded_vars.apply(self.__identify_column_type)) 
         
         # Ensure var is a string
         assert isinstance(var, str), f"The value of var must be str or one of {accepted_types}"
@@ -545,6 +552,25 @@ class Stastics:
         return results_df
     
 
+    def anova(self,target,condition):
+        
+        df_test = self.find_var([target,condition]).dropna()
+        model= sm.formula.ols(formula=f"{target} ~ {condition}", data = df_test).fit()
+        # Realizar ANOVA
+        anova_table = sm.stats.anova_lm(model, typ=2)
+        
+        self.dict_anova[": ".join([target,condition])] = anova_table.loc[condition][["F","PR(>F)"]].tolist()
+
+        # Create a DataFrame from the comparison results dictionary
+        results_df = pd.DataFrame(self.dict_anova).set_index("Name").T
+        
+        # Save the data in adata.uns
+        self.adata.uns["ANOVA_results"] = results_df 
+
+        return results_df
+
+    
+
     def chi_sq(self, col: str, expected_proportions=[0.5, 0.5]):
         """
         Perform a chi-squared test with the values of a metadata column.
@@ -597,7 +623,66 @@ class Stastics:
         return results_df
 
 
+        
+    def __get_cov_ellipse(self,cov, nstd):
+        """
+        Create an ellipse based on a covariance matrix and center point.
+        """
+        eigvals, eigvecs = np.linalg.eigh(cov)
+        order = eigvals.argsort()[::-1]
+        eigvals, eigvecs = eigvals[order], eigvecs[:, order]
+        vx, vy = eigvecs[:,0]
+        theta = np.degrees(np.arctan2(vy, vx))
+        width, height = 2 * nstd * np.sqrt(eigvals)
 
+        return width, height, theta
+    
+    def plot_pcoa(self,obsm_key,condition_name,save=False):
+        
+        fig, axs = plt.subplots(1, 1, figsize=(10, 6))
+
+        # Charge the data to plot
+        df_plot = self.adata.obsm[obsm_key]
+
+        # Create a column with the condition info
+        condition = self.find_var(condition_name)
+        df_plot[condition_name] = df_plot.index.map(dict(zip(condition.index, condition)))
+        
+        centroids = df_plot.groupby(condition_name).mean().reset_index()
+
+        centroids[condition_name] =  "CENTER "+centroids[condition_name]
+
+        sns.scatterplot(ax=axs, data=df_plot, x="PC1", y="PC2", hue=condition_name,s=40)
+
+        # Añadir los centroides al gráfico
+        sns.scatterplot(ax=axs, data=centroids, x='PC1', y='PC2', hue=condition_name, marker='s', s=200, legend=False)
+
+        # Obtener el color de las elipses
+        palette = sns.color_palette(n_colors=len(df_plot[condition_name].unique()))
+        color_dict = {label: palette[idx] for idx, label in enumerate(df_plot[condition_name].unique())}
+
+            # Añadir las elipses
+        for label, group in df_plot.groupby(condition_name):
+            cov = np.cov(group[['PC1', 'PC2']].T)
+            center = group[['PC1', 'PC2']].mean()
+            width, height, angle = self.__get_cov_ellipse(cov, 2)
+            ellipse = matplotlib.patches.Ellipse(xy=(center["PC1"], center["PC2"]), width=width, 
+                            height=height, angle=angle, edgecolor=color_dict[label], 
+                            facecolor='none', linestyle='--')
+            axs.add_patch(ellipse)
+
+        # Set the texts on the plot
+        axs.set_xlabel("PCo1")
+        axs.set_ylabel("PCo2")    
+        axs.set_title("Principal Coordinates Analysis",fontsize=14,fontweight=800)
+        
+        plt.legend( bbox_to_anchor=(1, 1),fontsize=9)
+        plt.tight_layout()
+        if save:
+            plt.savefig(save,bbox_inches="tight")
+
+        plt.show()
+    
 
 
     def plot_differences(self, condition, vars="All", kind="Violin", ylab="", xlab=" ", ylog=False, save=False, show=False):
