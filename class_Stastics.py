@@ -251,11 +251,13 @@ class Stastics:
         
         # Check if the variable is in the observation columns
         if var in self.adata.obs.columns:
-            return self.adata.obs[var]
+            variab = self.adata.obs[var]
+            return variab.astype(self.__identify_column_type(variab))
         
         # Check if the variable is in the variable names
         if var in self.adata.var_names:
-            return adata_df[var]
+            variab = adata_df[var]
+            return variab.astype(self.__identify_column_type(variab))
         
         # Raise an error if the variable is not found
         raise KeyError(f"The variable '{var}' can't be found in the anndata object")
@@ -567,7 +569,14 @@ class Stastics:
         # Save the data in adata.uns
         self.adata.uns["ANOVA_results"] = results_df 
 
-        return results_df
+        tukey = None
+        # If ANOVA is significant, perform Tukey's HSD
+        if anova_table['PR(>F)'][0] < 0.05:
+
+            tukey = sm.stats.multicomp.pairwise_tukeyhsd(endog=df_test[target], groups=df_test[condition], alpha=0.05).summary()
+
+        return results_df,tukey
+
 
     
 
