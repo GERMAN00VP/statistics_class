@@ -557,7 +557,9 @@ class Stastics:
     def anova(self,target,condition):
         
         df_test = self.find_var([target,condition]).dropna()
+
         model= sm.formula.ols(formula=f"{target} ~ {condition}", data = df_test).fit()
+
         # Realizar ANOVA
         anova_table = sm.stats.anova_lm(model, typ=2)
         
@@ -573,7 +575,10 @@ class Stastics:
         # If ANOVA is significant, perform Tukey's HSD
         if anova_table['PR(>F)'][0] < 0.05:
 
-            tukey = sm.stats.multicomp.pairwise_tukeyhsd(endog=df_test[target], groups=df_test[condition], alpha=0.05).summary()
+            # Create and format the post-hoc results dataframe
+            tukey =  pd.DataFrame(sm.stats.multicomp.pairwise_tukeyhsd(endog=df_test[target], groups=df_test[condition], alpha=0.05).summary())
+            tukey.columns = tukey.iloc[0]
+            tukey = tukey[1:].reset_index(drop=True)
 
         return results_df,tukey
 
@@ -713,15 +718,17 @@ class Stastics:
 
         if isinstance(vars, str) and vars == "All":  # If default, all variables are selected
             vars = self.adata.var_names
-            df_var = self.find_var(var=vars)
+
+            vars = list(vars)+[condition]
         
         elif isinstance(vars, str):  # If a single variable is selected
-            df_var = self.find_var(var=vars).to_frame()
+
+            df_var = self.find_var(var=[vars,condition])
 
         else:  # User selects some of the variables
-            df_var = self.find_var(var=vars)
+            df_var = self.find_var(var=list(vars)+[condition])
             
-        df_var[condition] = df_var.index.map(dict(zip(self.adata.obs.index, self.adata.obs[condition])))
+        #df_var[condition] = df_var.index.map(dict(zip(self.adata.obs.index, self.adata.obs[condition])))
 
 
         df_var = df_var.melt(id_vars=condition, value_name="value", var_name=xlab.upper())
