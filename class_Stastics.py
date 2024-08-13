@@ -38,14 +38,12 @@ class Stastics:
         # Initialize a dictionary and a datafame to store continous parways comparisons
         self.dict_comp_1_1 = {"Comparison":["Normal_Data","Test","P-value","Mean_Difference","Hodges_Lehmann_Estimator","N"]}
 
-        self.df_comp_1_1 = pd.DataFrame(self.dict_comp_1_1).T
-
         # Initialize a dictionary and a datafame to store categorical parways comparisons
         self.dict_chi_sq = {"Name":["Chi2_statistic","P-value","N"]}
-        self.adata.uns["CHI_SQ_TABLE"] = pd.DataFrame(self.dict_chi_sq).T
-
+        
         # Initialize a dictionary for anova results
-        self.dict_anova= {"Name":["F","P-value"]}
+        self.dict_anova= {"Name":["F","P-value","N","Post-Hoc (Tukey)"]}
+
 
     def __identify_column_type(self, series):
         """
@@ -77,6 +75,23 @@ class Stastics:
             
             return float
         
+    def __remove_unwanted_chars(self,df,unwanted_chars_dict={},revert_dict={},revert=False):
+
+        df1 = df.copy()
+        if revert:
+            revert_dict.update({"signopos":"+","_espacio_":" ","signoneg":"-","7barra7":"/"})
+
+            for wanted_char in revert_dict.keys():
+                df1.columns = df1.columns.str.replace(wanted_char,revert_dict[wanted_char],regex=True)
+
+            return df1
+
+        unwanted_chars_dict.update({"\+":"signopos"," ":"_espacio_","-":"signoneg","/":"7barra7"})
+        for unwanted_char in unwanted_chars_dict.keys():
+            df1.columns = df1.columns.str.replace(unwanted_char,unwanted_chars_dict[unwanted_char],regex=True)
+
+        return df1
+            
 
     def do_description(self, name="All", subset="All"):
         """
@@ -373,7 +388,7 @@ class Stastics:
             results_df["Significant"] = results_df["FDR"] < 0.05
 
         # Update the instance attribute with the results DataFrame
-        self.df_comp_1_1 = results_df
+        self.adata.uns["Comp_1_1"] = results_df
 
         return results_df
 
@@ -558,27 +573,45 @@ class Stastics:
         
         df_test = self.find_var([target,condition]).dropna()
 
-        model= sm.formula.ols(formula=f"{target} ~ {condition}", data = df_test).fit()
+        df_test = self.__remove_unwanted_chars(df_test)
+
+        N = df_test.shape[0]
+
+        model= sm.formula.ols(formula=f"{df_test.columns[0]} ~ {df_test.columns[1]}", data = df_test).fit()
 
         # Realizar ANOVA
         anova_table = sm.stats.anova_lm(model, typ=2)
         
-        self.dict_anova[": ".join([target,condition])] = anova_table.loc[condition][["F","PR(>F)"]].tolist()
+       
+        tukey = None
+        # If ANOVA is significant, perform Tukey's HSD
+
+        resT = ""
+        if anova_table['PR(>F)'][0] < 0.05:
+
+            # Create and format the post-hoc results dataframe
+            tukey =  pd.DataFrame(sm.stats.multicomp.pairwise_tukeyhsd(endog=df_test[df_test.columns[0]], 
+                                                                       groups=df_test[df_test.columns[1]], alpha=0.05).summary().data)
+            tukey.columns = tukey.iloc[0]
+            tukey = tukey[1:].reset_index(drop=True)
+            tukey[tukey["reject"].astype(bool)]
+
+            for i in tukey[tukey["reject"]].iterrows():
+                resT += f"{i[1]["group1"]} vs {i[1]["group2"]}; pval:{i[1]["p-adj"]}; meandiff:{i[1]["meandiff"]}||"
+
+        self.dict_anova[": ".join([target,condition])] = anova_table.loc[df_test.columns[-1]][["F","PR(>F)"]].tolist() + [N,resT]
 
         # Create a DataFrame from the comparison results dictionary
         results_df = pd.DataFrame(self.dict_anova).set_index("Name").T
         
         # Save the data in adata.uns
         self.adata.uns["ANOVA_results"] = results_df 
+        
+        if results_df.shape[0]>1:
 
-        tukey = None
-        # If ANOVA is significant, perform Tukey's HSD
-        if anova_table['PR(>F)'][0] < 0.05:
+            results_df["FDR"] = sp.stats.false_discovery_control(results_df["P-value"].tolist(), method="bh")
 
-            # Create and format the post-hoc results dataframe
-            tukey =  pd.DataFrame(sm.stats.multicomp.pairwise_tukeyhsd(endog=df_test[target], groups=df_test[condition], alpha=0.05).summary())
-            tukey.columns = tukey.iloc[0]
-            tukey = tukey[1:].reset_index(drop=True)
+            results_df["Significant"] = results_df["FDR"]<0.05
 
         return results_df,tukey
 
@@ -630,6 +663,10 @@ class Stastics:
 
         # Create a DataFrame from the comparison results dictionary
         results_df = pd.DataFrame(self.dict_chi_sq).set_index("Name").T
+        
+        # Evaluate fdr
+        results_df["FDR"] = sp.stats.false_discovery_control(results_df["P-value"].tolist(), method="bh")
+        results_df["Significant"] = results_df["FDR"] < 0.05
         
         # Save the data in adata.uns
         self.adata.uns["CHI_SQ_TABLE"] = results_df 
@@ -728,9 +765,6 @@ class Stastics:
         else:  # User selects some of the variables
             df_var = self.find_var(var=list(vars)+[condition])
             
-        #df_var[condition] = df_var.index.map(dict(zip(self.adata.obs.index, self.adata.obs[condition])))
-
-
         df_var = df_var.melt(id_vars=condition, value_name="value", var_name=xlab.upper())
 
         # Create the plot
@@ -759,18 +793,13 @@ class Stastics:
         plt.ylabel(ylab)
         plt.xticks(rotation=25, ha='right')
 
-        # If only one variable, do not show the ticks
-        if len(df_var[xlab].unique()) == 1:
-            plt.xticks([])
-
         # Place the legend
         plt.legend(title=condition, loc='best')
 
         sns.despine()
 
-        
         # Extraer los tick labels actuales del eje x y generar unos nuevos con el valor de la n
-        x_tick_labels = [f"{item.get_text().capitalize()} (n={df_var.dropna()[" "].value_counts()[item.get_text()]}) " for item in ax.get_xticklabels()]
+        x_tick_labels = [f"{item.get_text()} (n={df_var.dropna()[" "].value_counts()[item.get_text()]}) " for item in ax.get_xticklabels()]
 
         # Aplicar los nuevos tick labels al eje x
         ax.set_xticklabels(x_tick_labels)
