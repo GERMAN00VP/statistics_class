@@ -569,7 +569,7 @@ class Stastics:
         return results_df
     
 
-    def anova(self,target,condition):
+    def anova(self,target,condition,name="ANOVA_RESULTS"):
         
         df_test = self.find_var([target,condition]).dropna()
 
@@ -584,6 +584,7 @@ class Stastics:
         
        
         tukey = None
+
         # If ANOVA is significant, perform Tukey's HSD
 
         resT = ""
@@ -599,19 +600,29 @@ class Stastics:
             for i in tukey[tukey["reject"]].iterrows():
                 resT += f"{i[1]["group1"]} vs {i[1]["group2"]}; pval:{i[1]["p-adj"]}; meandiff:{i[1]["meandiff"]}||"
 
-        self.dict_anova[": ".join([target,condition])] = anova_table.loc[df_test.columns[-1]][["F","PR(>F)"]].tolist() + [N,resT]
+        
+
+        if f"{name}_dict" not in self.adata.uns.keys():
+
+            self.adata.uns[f"{name}_dict"] = {}
+            
+        self.adata.uns[f"{name}_dict"]["Name"] = self.dict_anova["Name"] # The model
+        self.adata.uns[f"{name}_dict"][": ".join([target,condition])] = anova_table.loc[df_test.columns[-1]][["F","PR(>F)"]].tolist() + [N,resT]
 
         # Create a DataFrame from the comparison results dictionary
-        results_df = pd.DataFrame(self.dict_anova).set_index("Name").T
-        
-        # Save the data in adata.uns
-        self.adata.uns["ANOVA_results"] = results_df 
-        
+        results_df = pd.DataFrame(self.adata.uns[f"{name}_dict"]).set_index("Name").T
+
+                      
         if results_df.shape[0]>1:
 
             results_df["FDR"] = sp.stats.false_discovery_control(results_df["P-value"].tolist(), method="bh")
 
             results_df["Significant"] = results_df["FDR"]<0.05
+        
+       
+       # Save the data in adata.uns
+        self.adata.uns[name] = results_df 
+
 
         return results_df,tukey
 
@@ -693,7 +704,7 @@ class Stastics:
         fig, axs = plt.subplots(1, 1, figsize=(10, 6))
 
         # Charge the data to plot
-        df_plot = self.adata.obsm[obsm_key]
+        df_plot = self.adata.obsm[obsm_key].copy()
 
         # Create a column with the condition info
         condition = self.find_var(condition_name)
