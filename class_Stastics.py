@@ -788,6 +788,10 @@ class Stastics:
             sns.boxplot(x=xlab, y="value", data=df_var, hue=condition, fliersize=0)
             # Enhance aesthetics
             plt.grid(True, which='both', linestyle='--', linewidth=0.5)  # Add a subtle grid
+
+        elif kind== "Bar":
+            sns.barplot(x=xlab, y="value", data=df_var,
+                        errwidth=1.6,capsize=0.1, edgecolor='black', palette="deep",hue=condition)
         
         else:
             print("Option not implemented yet")
