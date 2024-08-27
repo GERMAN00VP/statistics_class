@@ -7,6 +7,9 @@ import matplotlib
 import re
 import seaborn as sns
 import statsmodels.api as sm
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import roc_curve, roc_auc_score
 
 
 
@@ -67,6 +70,7 @@ class Stastics:
         
         # Threshold to consider as continuous vs categorical
         if unique_ratio < 0.1:
+            
             return object
         else:
             # If any of the non missing values is a string returns an object as well
@@ -79,19 +83,20 @@ class Stastics:
 
         df1 = df.copy()
         if revert:
-            revert_dict.update({"signopos":"+","_espacio_":" ","signoneg":"-","7barra7":"/"})
+            revert_dict.update({"signopos":"+","_espacio_":" ","signoneg":"-","7barra7":"/","_CORCHETE1_":"[","_CORCHETE2_":"]"})
 
             for wanted_char in revert_dict.keys():
                 df1.columns = df1.columns.str.replace(wanted_char,revert_dict[wanted_char],regex=True)
 
             return df1
 
-        unwanted_chars_dict.update({"\+":"signopos"," ":"_espacio_","-":"signoneg","/":"7barra7"})
+        unwanted_chars_dict.update({"\+":"signopos"," ":"_espacio_","-":"signoneg","/":"7barra7","\[":"_CORCHETE1_","\]":"_CORCHETE2_"})
         for unwanted_char in unwanted_chars_dict.keys():
             df1.columns = df1.columns.str.replace(unwanted_char,unwanted_chars_dict[unwanted_char],regex=True)
 
         return df1
-            
+    
+
 
     def do_description(self, name="All", subset="All"):
         """
@@ -177,9 +182,6 @@ class Stastics:
             if subgroup=="DROPNAS": # Filter out the missing values by var_name
 
                 indexes = self.adata.obs.dropna(subset=var_name).index
-
-                # Keep the non missing values observations for this variable of metadata
-                self.adata[indexes,:]
 
             elif type(subgroup)==list: # Filter out the  values not in subgroup of the var_name column
 
@@ -564,7 +566,7 @@ class Stastics:
             if np.all(np.array([self.adata.uns[result].index.tolist() != results_df.index.tolist() for result in self.adata.uns.keys()])):
                 self.adata.uns[f"{name}_Corr_report"] = results_df
         else:
-            self.adata.uns[f"{name}_Corr_report"] = results_df
+            self.adata.uns[name] = results_df
 
         return results_df
     
@@ -747,7 +749,7 @@ class Stastics:
     
 
 
-    def plot_differences(self, condition, vars="All", kind="Violin", ylab="", xlab=" ", ylog=False, save=False, show=False):
+    def plot_differences(self, condition, vars="All", kind="Violin", ylab="", xlab=" ", ylog=False, save=False, show=True):
         """
         Method to create violin or boxplots comparing different states of the data.
 
@@ -828,6 +830,114 @@ class Stastics:
         else:
             plt.close()
 
+    def plot_pca(self,vars:list,hue:str,title="",figsize=(8,6),save=False,show=True, ret_data = False):
+        """Calculates the pca of a set of variables and plot the 2 first components, colouring by a condition.
+
+        Args:
+            vars (list): list of variables to use.
+            hue (str): Defaults to ""
+            title (str, optional): title of the plot. Defaults to "".
+            figsize (tuple, optional): size of the plot. Defaults to (8,6).
+            save (bool, optional): Path where the plot is saved or not to save it. Defaults to False.
+            show (bool, optional): Show the plot or not. Defaults to True.
+        Returns:
+            a dataframe with 
+        """
+        # Prepare the data
+        dat = self.find_var(vars).dropna()  # Extract the data in a dataframe
+        data = StandardScaler().fit_transform(dat) # Scale the data
+        pca = PCA().fit(data)# Fit the PCA  
+        exp_var = pca.explained_variance_ratio_
+        data = pd.DataFrame(data=pca.transform(data)[:,:2],columns=["PC1","PC2"] ,index=dat.index)
+        data[hue]=self.find_var(hue).loc[dat.index] # Add the condition column
+        
+        # Crea una figura y un objeto de ejes
+        fig, ax = plt.subplots(figsize=figsize)
+        sns.scatterplot(data=data,x="PC1",y="PC2",hue=hue,ax = ax)
+        plt.title(title,fontweight=800)
+        plt.xlabel(f"PC1 (Exp variance: {round(exp_var[0]*100,2)} %)")
+        plt.ylabel(f"PC2 (Exp variance: {round(exp_var[1]*100,2)} %)")
+        if save:
+            plt.savefig(save, bbox_inches="tight")
+
+        if show:
+            plt.show()
+        else:
+            plt.close()
+
+        if ret_data:
+            return data
+
+
+    def roc_curve(self,target:str,label:str,title=False,save=False,show=True):
+
+        """Finds the optimal threshold and 
+
+        Args:
+            target (str): the continious value.
+            label (str): the categorycal value.
+            save (bool, optional): Path where the plot is saved or not to save it. Defaults to False.
+            show (bool, optional): Show the plot or not. Defaults to True.
+        Returns:
+            optimal_threshold (np.float): value of the optimal threshold. 
+        """
+
+        df_roc = self.find_var(var=[target,label]).dropna() # Import the data for the roc curve
+        df_roc1= df_roc.copy() # Backup_copy
+
+        dic = {val:i for i,val in enumerate(df_roc[label].unique())} # codyfy the labels into numeric values
+
+        df_roc[label]= df_roc[label].map(dic) # convert into a dummy variable
+
+        auc = roc_auc_score(df_roc[label],df_roc[target])
+
+        if auc<0.5: # Checks that the number 1 is placed in the positives
+            dic = {val:i for i,val in enumerate(df_roc1[label].sort_values(ascending=False).unique())} # codyfy the labels into numeric values
+            df_roc[label]= df_roc1[label].map(dic) # convert into a dummy variable
+            auc = roc_auc_score(df_roc[label],df_roc[target])
+
+        fpr, tpr, thresholds = roc_curve(df_roc[label],df_roc[target]) # Calculate the roc curve parameters
+
+
+        
+
+
+        # Encontrar el punto de corte óptimo (Youden's J)
+        youden_index = tpr - fpr
+        optimal_idx = np.argmax(youden_index)
+        optimal_threshold = thresholds[optimal_idx]
+
+
+        # Graficar la curva ROC
+        plt.figure()
+        plt.plot(fpr, tpr, color='darkorange', lw=2, label='Curva ROC (AUC = %0.2f)' % auc)
+        plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
+
+        plt.scatter(fpr[optimal_idx], tpr[optimal_idx], color='red', label='Optimal Threshold  (%.2f)' % optimal_threshold)
+
+        plt.xlim([0.0, 1.0])
+        plt.ylim([0.0, 1.05])
+        plt.xlabel('False Positive Rate')
+        plt.ylabel('True Positive Rate')
+
+        if title:
+            plt.title(title,fontweight=800)
+        else:  
+            plt.title(f'Curva ROC {target}',fontweight=800)
+
+        plt.legend(loc="lower right")
+        
+        if save:
+                plt.savefig(save, bbox_inches="tight")
+
+        if show:
+            plt.show()
+        else:
+            plt.close()
+        
+        return optimal_threshold
+
+            
 
     def plot_correlation(self, var1, var2, save=False, show=False):
         """
