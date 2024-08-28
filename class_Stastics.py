@@ -9,6 +9,7 @@ import seaborn as sns
 import statsmodels.api as sm
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
+from venn import venn
 from sklearn.metrics import roc_curve, roc_auc_score
 
 
@@ -32,7 +33,7 @@ class Stastics:
 
 
         # Automatic detection of the column type
-        self.adata.obs = self.adata.obs.astype(self.adata.obs.apply(self.__identify_column_type))
+        self.adata.obs = self.adata.obs.infer_objects()
 
         # Create an initial description file
         self.do_description()
@@ -47,37 +48,6 @@ class Stastics:
         # Initialize a dictionary for anova results
         self.dict_anova= {"Name":["F","P-value","N","Post-Hoc (Tukey)"]}
 
-
-    def __identify_column_type(self, series):
-        """
-        Identifies the type of a pandas Series as either categorical or continuous.
-
-        Parameters:
-        series (pd.Series): The pandas Series for which the column type is to be identified.
-
-        Returns:
-        type: Returns `object` if the series is considered categorical, otherwise `float` for continuous.
-        """
-        
-        # Calculate the number of unique values in the series
-        unique_values = len(series.unique())
-        
-        # Calculate the total number of values in the series
-        total_values = len(series)
-        
-        # Define a heuristic threshold
-        unique_ratio = unique_values / total_values
-        
-        # Threshold to consider as continuous vs categorical
-        if unique_ratio < 0.1:
-            
-            return object
-        else:
-            # If any of the non missing values is a string returns an object as well
-            if np.any(np.array([re.match(pattern="^-?\d+(\.\d+)?$",string=str(i))==None for i in series.dropna().unique()])):
-                return object
-            
-            return float
         
     def __remove_unwanted_chars(self,df,unwanted_chars_dict={},revert_dict={},revert=False):
 
@@ -124,9 +94,9 @@ class Stastics:
 
         # Iterate over each column in the DataFrame
         for col in df.columns:
-            if df[col].dtype != object:
-                # Handle numeric columns
 
+            if df[col].dtype == float:
+                # Handle numeric columns
                 cuentas = np.nan
                 condicion.append(cuentas)
                 cuen = len(df[col].dropna()) 
@@ -140,8 +110,7 @@ class Stastics:
                 normality.append(sp.stats.shapiro(df[col].dropna())[1] > 0.05)
 
             else:
-                # Handle categorical columns
-        
+                # Handle categorical columns        
                 cuentas = df[col].value_counts()
                 for cuent in cuentas.index:
                     condicion.append(cuent)
@@ -260,8 +229,7 @@ class Stastics:
         if isinstance(var, accepted_types):
             # Recursively find variables in the list-like structure
             finded_vars = pd.DataFrame([self.find_var(v, adata_df=adata_df) for v in var]).T
-
-            return finded_vars.astype(finded_vars.apply(self.__identify_column_type)) 
+            return finded_vars.infer_objects()
         
         # Ensure var is a string
         assert isinstance(var, str), f"The value of var must be str or one of {accepted_types}"
@@ -269,16 +237,16 @@ class Stastics:
         # Check if the variable is in the observation columns
         if var in self.adata.obs.columns:
             variab = self.adata.obs[var]
-            return variab.astype(self.__identify_column_type(variab))
+            return variab.infer_objects()
         
         # Check if the variable is in the variable names
         if var in self.adata.var_names:
             variab = adata_df[var]
-            return variab.astype(self.__identify_column_type(variab))
+            return variab.infer_objects()
         
         # Raise an error if the variable is not found
         raise KeyError(f"The variable '{var}' can't be found in the anndata object")
-
+    
 
     
     def __check_normality(self ,values:pd.Series,condition=None):
@@ -347,8 +315,7 @@ class Stastics:
         
         
         # Extract the values of the target variable, dropping missing values
-        df_test = self.find_var(var=[target,condition_name]).dropna()
-        df_test = df_test.astype(df_test.apply(self.__identify_column_type))
+        df_test = self.find_var(var=[target,condition_name]).dropna().infer_objects()
 
         values = df_test[target]
 
@@ -578,7 +545,7 @@ class Stastics:
         df_test = self.__remove_unwanted_chars(df_test)
 
         N = df_test.shape[0]
-
+        
         model= sm.formula.ols(formula=f"{df_test.columns[0]} ~ {df_test.columns[1]}", data = df_test).fit()
 
         # Realizar ANOVA
@@ -841,7 +808,7 @@ class Stastics:
             save (bool, optional): Path where the plot is saved or not to save it. Defaults to False.
             show (bool, optional): Show the plot or not. Defaults to True.
         Returns:
-            a dataframe with 
+            If ret_data==True returns a dataframe with the 2 PC and the hue.
         """
         # Prepare the data
         dat = self.find_var(vars).dropna()  # Extract the data in a dataframe
@@ -867,6 +834,23 @@ class Stastics:
 
         if ret_data:
             return data
+        
+
+
+    def plot_venn(self,columns:list):
+
+        """Plot a venn diagram of the samples intersection in 3 variables (booleans)
+
+        Args:
+            columns (list): a list of columns names, the columns must have bool values.
+        """
+
+        df = self.find_var(columns) 
+
+        venn({i:set(df[df[i]].index) for i in columns})
+
+        plt.show()
+
 
 
     def roc_curve(self,target:str,label:str,title=False,save=False,show=True):
