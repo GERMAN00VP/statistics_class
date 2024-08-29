@@ -40,7 +40,7 @@ class Stastics:
 
 
         # Initialize a dictionary and a datafame to store continous parways comparisons
-        self.dict_comp_1_1 = {"Comparison":["Normal_Data","Test","P-value","Mean_Difference","Hodges_Lehmann_Estimator","N"]}
+        self.dict_comp_1_1 = {"Name":["Normal_Data","Test","P-value","Mean_Difference","Hodges_Lehmann_Estimator","N"]}
 
         # Initialize a dictionary and a datafame to store categorical parways comparisons
         self.dict_chi_sq = {"Name":["Chi2_statistic","P-value","N"]}
@@ -301,7 +301,7 @@ class Stastics:
         return np.median(diffs)
 
     
-    def comparisons_1_1(self, target, condition_name: str):
+    def comparisons_1_1(self, target, condition: str,name="Comp_1_1"):
         """
         Performs T-test or Mann-Whitney U test comparisons between two variables.
 
@@ -315,23 +315,23 @@ class Stastics:
         
         
         # Extract the values of the target variable, dropping missing values
-        df_test = self.find_var(var=[target,condition_name]).dropna().infer_objects()
+        df_test = self.find_var(var=[target,condition]).dropna().infer_objects()
 
         values = df_test[target]
 
         assert values.dtype!= object, "Target must be a continious variable"
 
         # Extract the corresponding condition values
-        condition = df_test[condition_name]
+        condition_df = df_test[condition]
 
-        assert len(condition.unique())==2, "There must be two levels to compare"
+        assert len(condition_df.unique())==2, "There must be two levels to compare"
 
 
         # Check normality of the values based on the condition
-        normal = self.__check_normality(values, condition)
+        normal = self.__check_normality(values, condition_df)
 
         # Split the values into two Series based on the unique conditions
-        sep_values = [values[condition.index[condition == cond]].astype(float) for cond in condition.unique()]
+        sep_values = [values[condition_df.index[condition_df == cond]].astype(float) for cond in condition_df.unique()]
 
 
         if normal:
@@ -345,19 +345,28 @@ class Stastics:
             mean_dif = np.nan
             median_dif = self.__hodges_lehmann_estimator(sep_values[0], sep_values[1])
 
-        # Store the comparison results in a dictionary
-        self.dict_comp_1_1[f"{condition_name}: {target}"] = [normal, test, pval, mean_dif, median_dif, len(values)]
+
+        
+        if f"{name}_dict" not in self.adata.uns.keys():
+
+            self.adata.uns[f"{name}_dict"] = {}
+            
+        self.adata.uns[f"{name}_dict"]["Name"] = self.dict_comp_1_1["Name"]
+        self.adata.uns[f"{name}_dict"][": ".join([condition,target])] = [normal, test, pval, mean_dif, median_dif, len(values)]
 
         # Create a DataFrame from the comparison results dictionary
-        results_df = pd.DataFrame(self.dict_comp_1_1).set_index("Comparison").T
+        results_df = pd.DataFrame(self.adata.uns[f"{name}_dict"]).set_index("Name").T
 
-        if results_df.shape[0] > 1:
-            # Perform false discovery rate control
+                      
+        if results_df.shape[0]>1:
+
             results_df["FDR"] = sp.stats.false_discovery_control(results_df["P-value"].tolist(), method="bh")
-            results_df["Significant"] = results_df["FDR"] < 0.05
+
+            results_df["Significant"] = results_df["FDR"]<0.05
+        
 
         # Update the instance attribute with the results DataFrame
-        self.adata.uns["Comp_1_1"] = results_df
+        self.adata.uns[name] = results_df
 
         return results_df
 
@@ -575,7 +584,7 @@ class Stastics:
 
             self.adata.uns[f"{name}_dict"] = {}
             
-        self.adata.uns[f"{name}_dict"]["Name"] = self.dict_anova["Name"] # The model
+        self.adata.uns[f"{name}_dict"]["Name"] = self.dict_anova["Name"]
         self.adata.uns[f"{name}_dict"][": ".join([target,condition])] = anova_table.loc[df_test.columns[-1]][["F","PR(>F)"]].tolist() + [N,resT]
 
         # Create a DataFrame from the comparison results dictionary
@@ -716,51 +725,51 @@ class Stastics:
     
 
 
-    def plot_differences(self, condition, vars="All", kind="Violin", ylab="", xlab=" ", ylog=False, save=False, show=True):
+    def plot_differences(self, condition, vars, kind="Box", ylab="", xlab=" ", tick_label_names= [],
+                         ylog=False, save=False, show="Show",theme=False,palette="deep"):
         """
         Method to create violin or boxplots comparing different states of the data.
 
         Args:
             condition (str): The condition to compare the variables by.
-            vars (str, optional): Name of the variables to compare (list, np.array, or pd.Series). Defaults to "All".
-            kind (str, optional): "Box" for boxplot, "Violin" for violin plot. Defaults to "Violin".
+            vars (list): Name of the variables to compare (list, np.array, or pd.Series).
+            kind (str, optional): "Box" for boxplot, "Violin" for violin plot, "Bar" for barplot. Defaults to "Box".
             ylab (str, optional): Label of the y-axis. Defaults to "".
             xlab (str, optional): The name of the variables, appears in the x label. Defaults to " ".
+            theme (str,optional): Set a sns theme, options are ['paper', 'notebook', 'talk', 'poster']. Defaults to False.
+            palette (str|list): Set the colours of the plot (hue differences). Defoults to 'deep'.
+            tick_label_names (list, optional): Change the name of the tick labels shown.
             save (bool, optional): Path to save the figure. Defaults to False.
-            show (bool, optional): Whether to show the plot or close it directly. Defaults to False.
+            show (str, optional): Whether to show the plot, return it for user edition or close it directly. Defaults to "Show".
 
         Raises:
             AttributeError: If an unsupported kind of plot is requested.
         """
+        if theme:
+            sns.set_theme(theme)
 
-        if isinstance(vars, str) and vars == "All":  # If default, all variables are selected
-            vars = self.adata.var_names
-
-            vars = list(vars)+[condition]
-        
-        elif isinstance(vars, str):  # If a single variable is selected
-
-            df_var = self.find_var(var=[vars,condition])
-
-        else:  # User selects some of the variables
+        if type(vars)!=str:
             df_var = self.find_var(var=list(vars)+[condition])
+        else:
+            df_var = self.find_var(var=[vars,condition])
             
         df_var = df_var.melt(id_vars=condition, value_name="value", var_name=xlab.upper())
 
         # Create the plot
-        plt.figure(figsize=(10, 6))
+        fig = plt.figure(figsize=(10, 6))
 
         if kind == "Violin":
-            sns.violinplot(x=xlab, y="value", data=df_var, inner='quart', hue=condition, split=False)
+            sns.violinplot(x=xlab, y="value", data=df_var, inner='quart', hue=condition,palette=palette, split=False)
 
         elif kind == "Box":
-            sns.boxplot(x=xlab, y="value", data=df_var, hue=condition, fliersize=0)
-            # Enhance aesthetics
-            plt.grid(True, which='both', linestyle='--', linewidth=0.5)  # Add a subtle grid
+            sns.boxplot(x=xlab, y="value", data=df_var, hue=condition,palette=palette, fliersize=0)
+            if not ylog:
+                # Enhance aesthetics
+                plt.grid(True, which='both', linestyle='--', linewidth=0.5)  # Add a subtle grid
 
         elif kind== "Bar":
             sns.barplot(x=xlab, y="value", data=df_var,
-                        errwidth=1.6,capsize=0.1, edgecolor='black', palette="deep",hue=condition)
+                        errwidth=1.6,capsize=0.1, edgecolor='black', palette=palette,hue=condition)
         
         else:
             print("Option not implemented yet")
@@ -771,6 +780,7 @@ class Stastics:
 
         if ylog:
             plt.yscale("log")
+          
 
         # Add labels
         plt.xlabel(xlab)
@@ -785,15 +795,23 @@ class Stastics:
         # Extraer los tick labels actuales del eje x y generar unos nuevos con el valor de la n
         x_tick_labels = [f"{item.get_text()} (n={df_var.dropna()[" "].value_counts()[item.get_text()]}) " for item in ax.get_xticklabels()]
 
+        # Change the tick label names
+        if type(tick_label_names)==list and len(tick_label_names)>0:
+            x_tick_labels = [re.sub(".*\(",f"{tick_label_names[i]} (",item) for i, item in enumerate(x_tick_labels)]
+
         # Aplicar los nuevos tick labels al eje x
         ax.set_xticklabels(x_tick_labels)
 
-
+        sns.reset_orig()
         if save:
             plt.savefig(save, bbox_inches="tight")
 
-        if show:
+        if show=="Show":
             plt.show()
+
+        elif show == "Edit":
+            return fig,ax # Returns the figure so the user can edit it.
+        
         else:
             plt.close()
 
