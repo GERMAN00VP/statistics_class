@@ -726,7 +726,7 @@ class Stastics:
 
 
     def plot_differences(self, condition, vars, kind="Box", ylab="", xlab=" ", tick_label_names= [],
-                         ylog=False, save=False, show="Show",theme=False,palette="deep"):
+                         ylog=False, save=False, show="Show",theme=False,palette="deep",figsize=(10, 6)):
         """
         Method to create violin or boxplots comparing different states of the data.
 
@@ -756,7 +756,7 @@ class Stastics:
         df_var = df_var.melt(id_vars=condition, value_name="value", var_name=xlab.upper())
 
         # Create the plot
-        fig = plt.figure(figsize=(10, 6))
+        fig = plt.figure(figsize=figsize)
 
         if kind == "Violin":
             sns.violinplot(x=xlab, y="value", data=df_var, inner='quart', hue=condition,palette=palette, split=False)
@@ -899,11 +899,7 @@ class Stastics:
             auc = roc_auc_score(df_roc[label],df_roc[target])
 
         fpr, tpr, thresholds = roc_curve(df_roc[label],df_roc[target]) # Calculate the roc curve parameters
-
-
         
-
-
         # Encontrar el punto de corte óptimo (Youden's J)
         youden_index = tpr - fpr
         optimal_idx = np.argmax(youden_index)
@@ -941,39 +937,46 @@ class Stastics:
 
             
 
-    def plot_correlation(self, var1, var2, save=False, show=False):
+    def plot_correlation(self, var_x, var_y,hue=False, save=False, show=True,figsize=(5, 1.5),
+                         theme=False,palette="deep"):
         """
         Plot the correlation between two variables using a scatter plot.
 
         Args:
-            var1 (str): The name of the first variable.
-            var2 (str): The name of the second variable.
+            var_x (str): The name of the first variable (x axis).
+            var_y (str): The name of the second variable (y axis).
+            hue (str, optional): The condition to split the data by.  
+            palette (str or list, optional): The colors in the plot. Defaults to "deep".
+            theme (str,optional): Set a sns theme, options are ['paper', 'notebook', 'talk', 'poster']. Defaults to False.            
             save (bool or str, optional): Path to save the figure. Defaults to False.
-            show (bool, optional): Whether to show the plot or close it directly. Defaults to False.
-
-        Returns:
-            None
+            show (str, optional): Whether to show the plot, return it ("Edit") or close it directly. Defaults to "Show".
         """
 
-        df_plot = self.find_var([var1, var2]).dropna()
+        if theme:
+            sns.set_theme(theme)
 
-        # Create the plot
-        plt.figure(figsize=(10, 6))
-        
-        sns.scatterplot(x=var1, y=var2, data=df_plot)
-        
-        # Add a subtle grid
-        plt.grid(True, which='both', linestyle='--', linewidth=0.5)
+        if hue:
+            df_plot = self.find_var([var_x, var_y,hue]).dropna()
+            sns.lmplot(x=var_x, y=var_y, hue=hue, height=figsize[0],aspect=figsize[1],
+                        data=df_plot,palette=palette,legend_out=False)
+
+        else:
+            df_plot = self.find_var([var_x, var_y]).dropna()
+            sns.lmplot(x=var_x, y=var_y,data=df_plot,
+                       palette=palette,legend_out=False,height=figsize[0],aspect=figsize[1])
 
         sns.despine()
 
-        plt.title(f"Correlation: {var2} vs {var1} (n={df_plot.shape[0]})")
+        plt.title(f"Correlation: {var_y} vs {var_x} (n={df_plot.shape[0]})", fontweight=800)
+
+        sns.reset_orig()
 
         if save:
             plt.savefig(save, bbox_inches="tight")
 
         if show:
             plt.show()
+    
         else:
             plt.close()
 
