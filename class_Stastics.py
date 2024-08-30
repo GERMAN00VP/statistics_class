@@ -425,7 +425,7 @@ class Stastics:
 
 
     
-    def do_correlations(self, Variables_A, Variables_B, name):
+    def do_correlations(self, Variables_A, Variables_B, name, return_df = False):
         """
         Uses the __correlation() method from this class to create the correlation matrix 
         from the two groups of variables and generates a report from it.
@@ -434,6 +434,7 @@ class Stastics:
             Variables_A (list): List of variables to correlate from the first group.
             Variables_B (list): List of variables to correlate from the second group.
             name (str): Name to prefix the stored results and generated report.
+            return_df (bool, optional): Whether to return the resultant df or not.
 
         Returns:
             pd.DataFrame: DataFrame containing the generated correlation report.
@@ -454,7 +455,8 @@ class Stastics:
         # Generate the report from the correlation matrix
         results_df = self.generate_corr_report(name=name)
 
-        return results_df
+        if return_df:
+            return results_df
 
 
 
@@ -800,7 +802,7 @@ class Stastics:
             x_tick_labels = [re.sub(".*\(",f"{tick_label_names[i]} (",item) for i, item in enumerate(x_tick_labels)]
 
         # Aplicar los nuevos tick labels al eje x
-        ax.set_xticklabels(x_tick_labels)
+        ax.set_xticks([i[0] for i in enumerate(x_tick_labels)],labels = x_tick_labels )
 
         sns.reset_orig()
         if save:
