@@ -301,7 +301,7 @@ class Stastics:
         return np.median(diffs)
 
     
-    def comparisons_1_1(self, target, condition: str,name="Comp_1_1"):
+    def comparisons_1_1(self, target, condition: str = None,name="Comp_1_1"):
         """
         Performs T-test or Mann-Whitney U test comparisons between two variables.
 
@@ -313,9 +313,20 @@ class Stastics:
             pd.DataFrame: Updated results report of the comparisons.
         """
         
-        
-        # Extract the values of the target variable, dropping missing values
-        df_test = self.find_var(var=[target,condition]).dropna().infer_objects()
+        if type(condition)==type(None):
+            assert type(target) in [np.ndarray,pd.Series,list] and len(target)==2,"If condition not provided, the target must be an Iterable wuth len(target)==2"
+            # Extract the values of the target variable, dropping missing values
+            df_test = self.find_var(var=target).dropna().infer_objects().melt()
+            comparison_name = ": ".join([target[0],target[1]])
+            N=int(df_test.shape[0]/2)
+            target="value"
+            condition="variable"
+            
+        else:
+            # Extract the values of the target variable, dropping missing values
+            df_test = self.find_var(var=[target,condition]).dropna().infer_objects()
+            comparison_name = ": ".join([condition,target])
+            N=int(df_test.shape[0])
 
         values = df_test[target]
 
@@ -352,7 +363,9 @@ class Stastics:
             self.adata.uns[f"{name}_dict"] = {}
             
         self.adata.uns[f"{name}_dict"]["Name"] = self.dict_comp_1_1["Name"]
-        self.adata.uns[f"{name}_dict"][": ".join([condition,target])] = [normal, test, pval, mean_dif, median_dif, len(values)]
+
+
+        self.adata.uns[f"{name}_dict"][comparison_name] = [normal, test, pval, mean_dif, median_dif, N]
 
         # Create a DataFrame from the comparison results dictionary
         results_df = pd.DataFrame(self.adata.uns[f"{name}_dict"]).set_index("Name").T
