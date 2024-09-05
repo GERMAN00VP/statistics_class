@@ -11,6 +11,8 @@ from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 from venn import venn
 from sklearn.metrics import roc_curve, roc_auc_score
+from sklearn.cluster import KMeans
+
 
 
 
@@ -246,6 +248,18 @@ class Stastics:
         
         # Raise an error if the variable is not found
         raise KeyError(f"The variable '{var}' can't be found in the anndata object")
+
+    def make_dummy(self,var,in_place=False):
+        col = self.find_var(var)
+        dict_dummy = {}
+        for v in col.unique():
+            if in_place:
+                self.adata.obs[f"{var}_{v}"] = col==v
+            else:
+                dict_dummy[f"{var}_{v}"]=col==v
+
+        if not in_place:
+            return pd.DataFrame(dict_dummy)
     
 
     
@@ -676,6 +690,21 @@ class Stastics:
         self.adata.uns["CHI_SQ_TABLE"] = results_df 
 
         return results_df
+    
+
+    def clustering(self,variables:list=[], name = "K_means",kind="k-means",clusters=2,from_obsm=False):
+
+        if not from_obsm:
+            df = self.find_var(variables)
+
+        else:
+            df = self.adata.obsm[from_obsm]
+
+        if kind=="k-means":
+            # Predict the clusters
+            self.adata.obs[name] = KMeans(n_clusters=3).fit_predict(df)
+        else:
+            print("Option not implemented.")
 
 
         
@@ -692,25 +721,26 @@ class Stastics:
 
         return width, height, theta
     
+    
     def plot_pcoa(self,obsm_key,condition_name,save=False):
         
         fig, axs = plt.subplots(1, 1, figsize=(10, 6))
 
         # Charge the data to plot
-        df_plot = self.adata.obsm[obsm_key].copy()
+        df_plot = self.adata.obsm[obsm_key][["PC1","PC2"]].copy()
 
         # Create a column with the condition info
-        condition = self.find_var(condition_name)
+        condition = self.find_var(condition_name).astype(str)
         df_plot[condition_name] = df_plot.index.map(dict(zip(condition.index, condition)))
         
         centroids = df_plot.groupby(condition_name).mean().reset_index()
 
-        centroids[condition_name] =  "CENTER "+centroids[condition_name]
-
+        #centroids[condition_name] =  "CENTER "+centroids[condition_name]
+        centroids.set_index(condition_name,inplace=True)
         sns.scatterplot(ax=axs, data=df_plot, x="PC1", y="PC2", hue=condition_name,s=40)
 
         # Añadir los centroides al gráfico
-        sns.scatterplot(ax=axs, data=centroids, x='PC1', y='PC2', hue=condition_name, marker='s', s=200, legend=False)
+        #sns.scatterplot(ax=axs, data=centroids, x='PC1', y='PC2', hue=condition_name, marker='s', s=200, legend=False)
 
         # Obtener el color de las elipses
         palette = sns.color_palette(n_colors=len(df_plot[condition_name].unique()))
@@ -726,6 +756,9 @@ class Stastics:
                             facecolor='none', linestyle='--')
             axs.add_patch(ellipse)
 
+            plt.scatter(centroids["PC1"].loc[label],centroids["PC2"].loc[label],color=color_dict[label],s=200,marker="s")
+            
+  
         # Set the texts on the plot
         axs.set_xlabel("PCo1")
         axs.set_ylabel("PCo2")    
@@ -737,7 +770,6 @@ class Stastics:
             plt.savefig(save,bbox_inches="tight")
 
         plt.show()
-    
 
 
     def plot_differences(self, condition, vars, kind="Box", ylab="", xlab=" ", tick_label_names= [],
@@ -870,7 +902,7 @@ class Stastics:
         
 
 
-    def plot_venn(self,columns:list):
+    def plot_venn(self,columns:list,make_dummys=True,figsize= (20,20),show=True,save=False):
 
         """Plot a venn diagram of the samples intersection in 3 variables (booleans)
 
@@ -880,11 +912,24 @@ class Stastics:
 
         df = self.find_var(columns) 
 
-        venn({i:set(df[df[i]].index) for i in columns})
+        if make_dummys:
+            df = pd.concat([self.make_dummy(var = col) for col in columns],axis=1)
+            sub_plts = df.columns[df.columns.str.contains(columns[0])].tolist()
+            sub_plts_opt = df.columns[df.columns.str.contains(columns[1])].tolist()
 
-        plt.show()
+            fig,axs = plt.subplots(ncols=len(sub_plts),nrows=1,figsize=figsize)
 
+            for ax,plot in enumerate(sub_plts):
+                df_plot = df[[plot]+sub_plts_opt]
+                venn({i:set(df_plot[df_plot[i]].index) for i in df_plot.columns},ax=axs[ax])
 
+        else:
+            venn({i:set(df[df[i]].index) for i in df.columns})
+        
+        if show:
+            plt.show()
+        if save:
+            plt.savefig(save,bbox_inches="tight")
 
     def roc_curve(self,target:str,label:str,title=False,save=False,show=True):
 
