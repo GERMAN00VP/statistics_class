@@ -595,7 +595,7 @@ class Stastics:
         # If ANOVA is significant, perform Tukey's HSD
 
         resT = ""
-        if anova_table['PR(>F)'][0] < 0.05:
+        if anova_table['PR(>F)'].iloc[0] < 0.05:
 
             # Create and format the post-hoc results dataframe
             tukey =  pd.DataFrame(sm.stats.multicomp.pairwise_tukeyhsd(endog=df_test[df_test.columns[0]], 
@@ -773,7 +773,7 @@ class Stastics:
 
 
     def plot_differences(self, condition, vars, kind="Box", ylab="", xlab=" ", tick_label_names= [],
-                         ylog=False, save=False, show="Show",theme=False,palette="deep",figsize=(10, 6)):
+                         ylog=False,show_n=True, save=False, show="Show",theme=False,palette="deep",figsize=(10, 6)):
         """
         Method to create violin or boxplots comparing different states of the data.
 
@@ -785,6 +785,7 @@ class Stastics:
             xlab (str, optional): The name of the variables, appears in the x label. Defaults to " ".
             theme (str,optional): Set a sns theme, options are ['paper', 'notebook', 'talk', 'poster']. Defaults to False.
             palette (str|list): Set the colours of the plot (hue differences). Defoults to 'deep'.
+            show_n (bool, optional): If False it hides the number of samples being plotted from the tick label name. Defaults to True.
             tick_label_names (list, optional): Change the name of the tick labels shown.
             save (bool, optional): Path to save the figure. Defaults to False.
             show (str, optional): Whether to show the plot, return it for user edition or close it directly. Defaults to "Show".
@@ -816,7 +817,7 @@ class Stastics:
 
         elif kind== "Bar":
             sns.barplot(x=xlab, y="value", data=df_var,
-                        errwidth=1.6,capsize=0.1, edgecolor='black', palette=palette,hue=condition)
+                        err_kws={'linewidth': 1.6},capsize=0.1, edgecolor='black', palette=palette,hue=condition)
         
         else:
             print("Option not implemented yet")
@@ -839,13 +840,18 @@ class Stastics:
 
         sns.despine()
 
-        # Extraer los tick labels actuales del eje x y generar unos nuevos con el valor de la n
-        x_tick_labels = [f"{item.get_text()} (n={df_var.dropna()[" "].value_counts()[item.get_text()]}) " for item in ax.get_xticklabels()]
+        if show_n:
+            # Extraer los tick labels actuales del eje x y generar unos nuevos con el valor de la n
+            x_tick_labels = [f"{item.get_text()} (n={df_var.dropna()[" "].value_counts()[item.get_text()]}) " for item in ax.get_xticklabels()]
+        else:
+            x_tick_labels = [item.get_text() for item in ax.get_xticklabels()]
 
         # Change the tick label names
         if type(tick_label_names)==list and len(tick_label_names)>0:
             x_tick_labels = [re.sub(".*\(",f"{tick_label_names[i]} (",item) for i, item in enumerate(x_tick_labels)]
-
+            if not show_n:
+                x_tick_labels = [tick_label_names[i] for i, item in enumerate(x_tick_labels)]
+                
         # Aplicar los nuevos tick labels al eje x
         ax.set_xticks([i[0] for i in enumerate(x_tick_labels)],labels = x_tick_labels )
 
