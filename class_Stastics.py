@@ -250,7 +250,7 @@ class Stastics:
         raise KeyError(f"The variable '{var}' can't be found in the anndata object")
 
     def make_dummy(self,var,in_place=False):
-        col = self.find_var(var)
+        col = self.find_var(var).dropna()
         dict_dummy = {}
         for v in col.unique():
             if in_place:
@@ -919,7 +919,7 @@ class Stastics:
         df = self.find_var(columns) 
 
         if make_dummys:
-            df = pd.concat([self.make_dummy(var = col) for col in columns],axis=1)
+            df = pd.concat([self.make_dummy(var = col) for col in columns],axis=1).dropna()
             sub_plts = df.columns[df.columns.str.contains(columns[0])].tolist()
             sub_plts_opt = df.columns[df.columns.str.contains(columns[1])].tolist()
 
@@ -931,11 +931,11 @@ class Stastics:
 
         else:
             venn({i:set(df[df[i]].index) for i in df.columns})
-        
-        if show:
-            plt.show()
+
         if save:
             plt.savefig(save,bbox_inches="tight")
+        if show:
+            plt.show()
 
     def roc_curve(self,target:str,label:str,title=False,save=False,show=True):
 
@@ -1003,7 +1003,7 @@ class Stastics:
 
             
 
-    def plot_correlation(self, var_x, var_y,hue=False, save=False, show=True,figsize=(5, 1.5),
+    def plot_correlation(self, var_x, var_y,hue=False, save=False, show="Show",figsize=(5, 1.5),
                          theme=False,palette="deep"):
         """
         Plot the correlation between two variables using a scatter plot.
@@ -1017,18 +1017,17 @@ class Stastics:
             save (bool or str, optional): Path to save the figure. Defaults to False.
             show (str, optional): Whether to show the plot, return it ("Edit") or close it directly. Defaults to "Show".
         """
-
         if theme:
             sns.set_theme(theme)
 
         if hue:
             df_plot = self.find_var([var_x, var_y,hue]).dropna()
-            sns.lmplot(x=var_x, y=var_y, hue=hue, height=figsize[0],aspect=figsize[1],
+            ax = sns.lmplot(x=var_x, y=var_y, hue=hue, height=figsize[0],aspect=figsize[1],
                         data=df_plot,palette=palette,legend_out=False)
 
         else:
             df_plot = self.find_var([var_x, var_y]).dropna()
-            sns.lmplot(x=var_x, y=var_y,data=df_plot,
+            ax = sns.lmplot(x=var_x, y=var_y,data=df_plot,
                        palette=palette,legend_out=False,height=figsize[0],aspect=figsize[1])
 
         sns.despine()
@@ -1040,9 +1039,11 @@ class Stastics:
         if save:
             plt.savefig(save, bbox_inches="tight")
 
-        if show:
+        if show=="Show":
             plt.show()
-    
+
+        elif show == "Edit":
+            return ax # Returns the figure so the user can edit it.
+        
         else:
             plt.close()
-
