@@ -279,8 +279,11 @@ class Stastics:
 
         if type(condition)!="NoneType": # If a condition is provided
 
+            normal = np.all([sp.stats.shapiro(values[condition.index[condition==i]].astype(float))[1]>0.05  for i in condition.unique()])
+            homocedastic = sp.stats.levene(values[condition.index[condition==condition.unique()[0]]].astype(float),
+                                           values[condition.index[condition==condition.unique()[1]]].astype(float))[1]>0.05
             # Check the normality of every condition
-            return np.all([sp.stats.shapiro(values[condition.index[condition==i]].astype(float))[1]>0.05  for i in condition.unique()])
+            return normal & homocedastic
         
         # Check the normality of all values
         return sp.stats.shapiro(values)[1]>0.05
@@ -702,7 +705,7 @@ class Stastics:
 
         if kind=="k-means":
             # Predict the clusters
-            self.adata.obs[name] = KMeans(n_clusters=3).fit_predict(df)
+            self.adata.obs[name] = KMeans(n_clusters=clusters,random_state=123).fit_predict(df)
         else:
             print("Option not implemented.")
 
@@ -722,25 +725,26 @@ class Stastics:
         return width, height, theta
     
     
-    def plot_pcoa(self,obsm_key,condition_name,save=False):
-        
-        fig, axs = plt.subplots(1, 1, figsize=(10, 6))
-
+    def plot_pcoa(self,obsm_key,condition_name,save=False,show=True,ax=None,exp_var = None):
         # Charge the data to plot
-        df_plot = self.adata.obsm[obsm_key][["PC1","PC2"]].copy()
+        df_plot = self.adata.obsm[obsm_key][["PC1","PC2"]]
 
         # Create a column with the condition info
-        condition = self.find_var(condition_name).astype(str)
+        condition = self.find_var(condition_name).dropna().astype(str)
+
         df_plot[condition_name] = df_plot.index.map(dict(zip(condition.index, condition)))
+
+        df_plot = df_plot.dropna()
         
         centroids = df_plot.groupby(condition_name).mean().reset_index()
 
         #centroids[condition_name] =  "CENTER "+centroids[condition_name]
         centroids.set_index(condition_name,inplace=True)
-        sns.scatterplot(ax=axs, data=df_plot, x="PC1", y="PC2", hue=condition_name,s=40)
 
-        # Añadir los centroides al gráfico
-        #sns.scatterplot(ax=axs, data=centroids, x='PC1', y='PC2', hue=condition_name, marker='s', s=200, legend=False)
+        if ax is None:  # If no axis is provided, create a new figure
+            fig, ax = plt.subplots(1, 1, figsize=(10, 6))
+
+        sns.scatterplot(ax=ax, data=df_plot, x="PC1", y="PC2", hue=condition_name, s=40)
 
         # Obtener el color de las elipses
         palette = sns.color_palette(n_colors=len(df_plot[condition_name].unique()))
@@ -751,25 +755,35 @@ class Stastics:
             cov = np.cov(group[['PC1', 'PC2']].T)
             center = group[['PC1', 'PC2']].mean()
             width, height, angle = self.__get_cov_ellipse(cov, 2)
+
             ellipse = matplotlib.patches.Ellipse(xy=(center["PC1"], center["PC2"]), width=width, 
                             height=height, angle=angle, edgecolor=color_dict[label], 
                             facecolor='none', linestyle='--')
-            axs.add_patch(ellipse)
+            ax.add_patch(ellipse)
 
-            plt.scatter(centroids["PC1"].loc[label],centroids["PC2"].loc[label],color=color_dict[label],s=200,marker="s")
+             # Asegúrate de graficar el centroide en el eje correcto
+            ax.scatter(centroids["PC1"].loc[label], centroids["PC2"].loc[label], color=color_dict[label], s=200, marker="s")
             
   
         # Set the texts on the plot
-        axs.set_xlabel("PCo1")
-        axs.set_ylabel("PCo2")    
-        axs.set_title("Principal Coordinates Analysis",fontsize=14,fontweight=800)
-        
+        if exp_var is None:
+            ax.set_xlabel("PCo1")
+            ax.set_ylabel("PCo2")    
+        else:
+
+            ax.set_xlabel(f"PCo1 (Explained Variance {exp_var["PC1"]}%)")
+            ax.set_ylabel(f"PCo2 (Explained Variance {exp_var["PC2"]}%)")   
+
         plt.legend( bbox_to_anchor=(1, 1),fontsize=9)
         plt.tight_layout()
         if save:
             plt.savefig(save,bbox_inches="tight")
+        
+        if show:
+            plt.show()
 
-        plt.show()
+        if not ax is None:
+            return ax
 
 
     def plot_differences(self, condition, vars, kind="Box", ylab="", xlab=" ", tick_label_names= [],
