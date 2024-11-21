@@ -12,7 +12,11 @@ from sklearn.preprocessing import StandardScaler
 from venn import venn
 from sklearn.metrics import roc_curve, roc_auc_score
 from sklearn.cluster import KMeans
-
+# SKBIO IMPORTS
+from skbio.stats import subsample_counts
+from skbio.diversity import alpha_diversity
+from skbio.diversity import beta_diversity
+from skbio.stats.ordination import pcoa
 
 
 
@@ -287,7 +291,43 @@ class Stastics:
         
         # Check the normality of all values
         return sp.stats.shapiro(values)[1]>0.05
+
+           
+
         
+    def calc_alpha_div(self, vars = "", name="Alpha_div"):       
+
+        self.adata.obs[name] = alpha_diversity("shannon",counts= self.adata.to_df()[vars],ids=self.adata.obs_names)
+        
+
+    def calc_beta_div(self,vars,in_place=True):
+
+        data = self.adata.to_df()[vars]
+
+        dm = beta_diversity("braycurtis", data, self.adata.obs_names)
+
+        coord = pcoa(dm)
+
+        df_plo = coord.samples[["PC1",'PC2']]
+        distancematrix = pd.DataFrame(dm.data,columns=self.adata.obs_names,index=self.adata.obs_names)
+
+        exp_var=round(coord.proportion_explained*100,2)
+
+        if in_place:
+
+            self.adata.obsm["PCoA"]  = df_plo
+
+            self.adata.obsm["Distance_matrix"] = pd.DataFrame(dm.data,columns=self.adata.obs_names,index=self.adata.obs_names)
+
+            self.adata.uns["PCoA_exp_var"]= exp_var
+
+            print("Saving PCoA and Distance matrix in obsm as: PCoA and Distance_matrix")
+
+        else:
+
+            print("Returning PCoA and Distance matrix")
+
+            return df_plo, distancematrix, exp_var
 
 
 
@@ -709,6 +749,14 @@ class Stastics:
         else:
             print("Option not implemented.")
 
+    def generar_diccionario_colores(self,valores):
+        # Genera un colormap que cubre una cantidad de colores igual a la longitud de la lista
+        colores = plt.cm.tab10(range(len(valores)))  # Usa colormap 'tab10', que tiene 10 colores distintos
+        
+        # Crear el diccionario con cada valor de la lista como clave y su color asignado como valor
+        diccionario_colores = {valor: colores[i] for i, valor in enumerate(valores)}
+        return diccionario_colores
+
 
         
     def __get_cov_ellipse(self,cov, nstd):
@@ -725,7 +773,7 @@ class Stastics:
         return width, height, theta
     
     
-    def plot_pcoa(self,obsm_key,condition_name,save=False,show=True,ax=None,exp_var = None):
+    def plot_pcoa(self,obsm_key,condition_name,save=False,show=True,ax=None,exp_var = None, palette=None):
         # Charge the data to plot
         df_plot = self.adata.obsm[obsm_key][["PC1","PC2"]]
 
@@ -741,14 +789,18 @@ class Stastics:
         #centroids[condition_name] =  "CENTER "+centroids[condition_name]
         centroids.set_index(condition_name,inplace=True)
 
+        if palette is None:
+            # Obtener el color de las elipses
+            palette = self.generar_diccionario_colores(self.find_var(condition_name).unique())
+
+
         if ax is None:  # If no axis is provided, create a new figure
             fig, ax = plt.subplots(1, 1, figsize=(10, 6))
 
-        sns.scatterplot(ax=ax, data=df_plot, x="PC1", y="PC2", hue=condition_name, s=40)
+        sns.scatterplot(ax=ax, data=df_plot, x="PC1", y="PC2", hue=condition_name, s=40,palette=palette)
 
-        # Obtener el color de las elipses
-        palette = sns.color_palette(n_colors=len(df_plot[condition_name].unique()))
-        color_dict = {label: palette[idx] for idx, label in enumerate(df_plot[condition_name].unique())}
+
+        #color_dict = {label: palette[idx] for idx, label in enumerate(df_plot[condition_name].unique())}
 
             # Añadir las elipses
         for label, group in df_plot.groupby(condition_name):
@@ -757,12 +809,12 @@ class Stastics:
             width, height, angle = self.__get_cov_ellipse(cov, 2)
 
             ellipse = matplotlib.patches.Ellipse(xy=(center["PC1"], center["PC2"]), width=width, 
-                            height=height, angle=angle, edgecolor=color_dict[label], 
+                            height=height, angle=angle, edgecolor=palette[label], 
                             facecolor='none', linestyle='--')
             ax.add_patch(ellipse)
 
              # Asegúrate de graficar el centroide en el eje correcto
-            ax.scatter(centroids["PC1"].loc[label], centroids["PC2"].loc[label], color=color_dict[label], s=200, marker="s")
+            ax.scatter(centroids["PC1"].loc[label], centroids["PC2"].loc[label], color=palette[label], s=200, marker="s")
             
   
         # Set the texts on the plot
