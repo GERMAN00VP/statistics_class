@@ -113,7 +113,10 @@ class Stastics:
                 desvest = df[col].describe()["std"]
                 means.append(f"{round(mean, 2)} ± {round(desvest, 2)}")
                 medians.append(round(df[col].median(), 2))
-                normality.append(sp.stats.shapiro(df[col].dropna())[1] > 0.05)
+                try:
+                    normality.append(sp.stats.shapiro(df[col].dropna())[1] > 0.05)
+                except :
+                    normality.append(None)
 
             else:
                 # Handle categorical columns        
@@ -295,20 +298,76 @@ class Stastics:
            
 
         
-    def calc_alpha_div(self, vars = "", name="Alpha_div"):       
+    def calc_alpha_div(self, vars = "", name="Alpha_div",level=False, index= "shannon"):       
+        """
+        Calculate alpha diversity for the dataset and store the results in the `obs` attribute.
 
-        self.adata.obs[name] = alpha_diversity("shannon",counts= self.adata.to_df()[vars],ids=self.adata.obs_names)
+        Parameters:
+        -----------
+        vars : str or list, optional
+            A list of variable names (features) to include in the calculation. If an empty string 
+            (default), all variables in `adata.var.index` are used.
+
+        name : str, optional
+            The base name for the new column in `adata.obs` where the results will be stored. 
+            Defaults to "Alpha_div". If `level` is specified, the name will include the level 
+            and index type.
+
+        level : str or bool, optional
+            If specified, aggregates data by the given level (a column in `adata.var`). The 
+            aggregated data will be grouped and summed based on this level. Defaults to `False`.
+
+        index : str, optional
+            The diversity index to calculate. Must be one of ["shannon", "chao1", "simpson"]. 
+            Defaults to "shannon".
+
+        Returns:
+        --------
+        None
+            The calculated alpha diversity values are stored in the `obs` attribute of the 
+            `adata` object, under the column name specified by `name`.
+
+        Notes:
+        ------
+        - If `level` is specified, the data is grouped by the specified level in `adata.var`.
+        - The column name in `adata.obs` will include the `level` and `index` if applicable.
+        - An assertion ensures that the `index` parameter is valid.
+        """
+
+        assert index in ["shannon", "chao1","simpson",]
+
+        if vars=="":
+            vars=self.adata.var.index.tolist()
+            df = self.adata.to_df()[vars]
+        
+        if level:
+            df = self.adata.to_df().T
+            df[level]=self.adata.var[level]
+            df =df.groupby(level).sum()
+            df = df.rename({"":"Unclassified"}).T
+            name = name+"_level_"+level +  ("_"+index if index != "shannon" else "")
+
+        self.adata.obs[name] = alpha_diversity(index,counts= df,ids=self.adata.obs_names)
         
 
-    def calc_beta_div(self,vars,in_place=True):
+    def calc_beta_div(self,vars="",in_place=True,level=False):
 
-        data = self.adata.to_df()[vars]
+        if vars=="":
+            vars=self.adata.var.index.tolist()
+            data = self.adata.to_df()[vars]
+        
+        if level:
+            data = self.adata.to_df().T
+            data[level]=self.adata.var[level]
+            data =data.groupby(level).sum()
+            data = data.rename({"":"Unclassified"}).T
 
         dm = beta_diversity("braycurtis", data, self.adata.obs_names)
 
         coord = pcoa(dm)
 
         df_plo = coord.samples[["PC1",'PC2']]
+
         distancematrix = pd.DataFrame(dm.data,columns=self.adata.obs_names,index=self.adata.obs_names)
 
         exp_var=round(coord.proportion_explained*100,2)
@@ -327,7 +386,41 @@ class Stastics:
 
             print("Returning PCoA and Distance matrix")
 
-            return df_plo, distancematrix, exp_var
+            return df_plo, distancematrix, exp_var, 
+
+    
+    def clr_transformation(self, pseudocount=1e-9, name="CLR_DATA"):
+        """
+        Apply CLR transformation to the raw counts of an AnnData object and store the result in adata.obsm.
+        
+        Parameters:
+        - adata: AnnData object with raw counts in adata.X.
+        - pseudocount: Small value added to avoid issues with zeroes (default is 1e-9).
+        - name: The name for storing the CLR-transformed data in adata.obsm (default is "CLR_DATA").
+        """
+        
+        # Convert raw counts (adata.X) to a pandas DataFrame for easier manipulation
+        df_ab = self.adata.to_df()  # This assumes raw counts are stored in adata.raw.X
+        
+        # Convert the DataFrame to numpy array
+        data_clr = df_ab.to_numpy(float)
+        
+        # Add a pseudocount to avoid issues with zeroes
+        data_clr += pseudocount
+        
+        # Compute the geometric mean across rows (samples)
+        geometric_mean = np.exp(np.mean(np.log(data_clr), axis=1, keepdims=True))
+        
+        # Apply CLR transformation
+        clr_transformed = np.log(data_clr / geometric_mean)
+
+        clr_transformed = pd.DataFrame(clr_transformed, columns=df_ab.columns, index=df_ab.index)
+        
+        # Store the CLR transformed data in adata.obsm with the given name
+        self.adata.obsm[name] = clr_transformed
+        
+        # Optionally, return the transformed data as a DataFrame for inspection
+        return clr_transformed
 
 
 
@@ -838,7 +931,7 @@ class Stastics:
             return ax
 
 
-    def plot_differences(self, condition, vars, kind="Box", ylab="", xlab=" ", tick_label_names= [],
+    def plot_differences(self, condition, vars, kind="Box", ylab="", xlab=" ", tick_label_names= [],title = "",obsm_name=False,
                          ylog=False,show_n=True, save=False, show="Show",theme=False,palette="deep",figsize=(10, 6)):
         """
         Method to create violin or boxplots comparing different states of the data.
@@ -855,6 +948,7 @@ class Stastics:
             tick_label_names (list, optional): Change the name of the tick labels shown.
             save (bool, optional): Path to save the figure. Defaults to False.
             show (str, optional): Whether to show the plot, return it for user edition or close it directly. Defaults to "Show".
+            obsm_name = bool, if a str is provided uses this as the reference for plotting
 
         Raises:
             AttributeError: If an unsupported kind of plot is requested.
@@ -862,10 +956,18 @@ class Stastics:
         if theme:
             sns.set_theme(theme)
 
-        if type(vars)!=str:
-            df_var = self.find_var(var=list(vars)+[condition])
+        if obsm_name:
+
+            adata_df = self.adata.obsm[obsm_name]
+
         else:
-            df_var = self.find_var(var=[vars,condition])
+            adata_df = None
+
+
+        if type(vars)!=str:
+            df_var = self.find_var(var=list(vars)+[condition],adata_df=adata_df)
+        else:
+            df_var = self.find_var(var=[vars,condition],adata_df=adata_df)
             
         df_var = df_var.melt(id_vars=condition, value_name="value", var_name=xlab.upper())
 
@@ -894,6 +996,8 @@ class Stastics:
 
         if ylog:
             plt.yscale("log")
+
+        plt.title(title,fontweight=600)
           
 
         # Add labels
@@ -933,6 +1037,9 @@ class Stastics:
         
         else:
             plt.close()
+            
+        return df_var
+        
 
     def plot_pca(self,vars:list,hue:str,title="",figsize=(8,6),save=False,show=True, ret_data = False):
         """Calculates the pca of a set of variables and plot the 2 first components, colouring by a condition.
