@@ -930,6 +930,62 @@ class Stastics:
         if not ax is None:
             return ax
 
+    def plot_merged_abundances(self, condition, taxon, palette=None, ax = None,
+                        level="Genus",violin=False,y_log=False,save=False,
+                        show=True):
+        """
+        Creates a plot to compare the abundances of a specified taxon at a particular 
+        taxonomic level (e.g., Genus, Family) across groups defined by a condition.
+
+        Args:
+            condition (str): The metadata column name that defines the groups to compare.
+            taxon (str): The name of the taxon to plot (e.g., a genus or family).
+            palette (dict): A dictionary mapping group names to colors for the plot.
+            ax (matplotlib.axes._axes.Axes, optional): An existing matplotlib Axes object 
+                to plot on. If None, a new figure and Axes will be created. Defaults to None.
+            level (str, optional): The taxonomic level to consider (e.g., "Genus", "Family"). 
+                Defaults to "Genus".
+            violin (bool, optional): Whether to create a violin plot instead of a box plot. 
+                Defaults to False.
+            y_log (bool, optional): Whether to use a logarithmic scale for the y-axis. 
+                Defaults to False.
+            save (bool, optional): Whether to save the plot to a file. Defaults to False.
+            show (bool, optional): Whether to display the plot. Defaults to True.
+
+        Returns:
+            matplotlib.axes._axes.Axes: The Axes object containing the plot, which allows 
+                for further customization or saving.
+        """
+
+        targetvars = self.adata.var[level].dropna()[self.adata.var[level].dropna()==taxon].index
+        targetvar = self.find_var(targetvars).sum(axis=1)
+        df_plot = pd.DataFrame([targetvar,self.find_var(condition)],index=[taxon,condition]).T
+
+        # Create an axe for plotting
+        if ax is None:
+            fig,ax = plt.subplots(1,figsize=(5,5))
+
+        if violin:
+            sns.violinplot(df_plot,x=condition,y=taxon,palette=palette,ax=ax)
+
+        else:
+            sns.boxplot(df_plot,x=condition,y=taxon,fliersize=0,palette=palette,ax = ax)
+
+        sns.stripplot(df_plot,x=condition,y=taxon,color="black",alpha=0.7,ax=ax)
+
+        if y_log:
+            ax.set_yscale("log")
+
+        if save:
+            plt.savefig(save,bbox_inches="tight")
+        
+        # Show the result
+        if show:
+            plt.show()
+
+        # Return the ax object
+        else:
+            return ax 
 
     def plot_differences(self, condition, vars, kind="Box", ylab="", xlab=" ", tick_label_names= [],title = "",obsm_name=False,
                          ylog=False,show_n=True, save=False, show="Show",theme=False,palette="deep",figsize=(10, 6)):
